@@ -33,18 +33,19 @@ pip install joblib matplotlib protobuf==4.25.3 numpy==1.26.4
 
 # 7. Download DreamShaper and RealisticVision models
 mkdir -p models/Stable-diffusion
+mkdir -p models/Lora
 
-# DreamShaper v7
+# 🎨 DreamShaper v7 (SD 1.5 - stylized rendering)
 wget -O models/Stable-diffusion/DreamShaper_v7.safetensors \
-  "https://civitai.com/api/download/models/128713?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
+  "https://huggingface.co/digiplay/DreamShaper_7/resolve/main/dreamshaper_7.safetensors"
 
-# RealisticVision v5.1
+# 👁️ RealisticVision v5.1 (SD 1.5 - photorealistic detail)
 wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors \
-  "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
+  "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1.safetensors"
 
-# SDXL Base 1.0
-wget -O models/Stable-diffusion/sd_xl_base_1.0.safetensors \
-  "https://civitai.com/api/download/models/126591?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors"
+# 🧠 Josef Koudelka Style LoRA (SDXL aesthetic modifier)
+wget -O models/Lora/Josef_Koudelka_Style_SDXL.safetensors \
+  "https://huggingface.co/TheLastBen/Josef_Koudelka_Style_SDXL/resolve/main/koud.safetensors"
 
 # 8. Export variables to avoid permission warnings
 export MPLCONFIGDIR=/tmp
