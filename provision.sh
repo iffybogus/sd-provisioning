@@ -1,36 +1,62 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
+# Exit on any error
 set -e
 
-# Add forgeuser and grant sudo
-useradd -m forgeuser
-echo "forgeuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Create user 'forgeuser' with no password and no prompt
+useradd -m forgeuser || true
 
-# Set up working directory
+# Give 'forgeuser' sudo privileges
+if ! grep -q '^forgeuser' /etc/sudoers; then
+  echo 'forgeuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+fi
+
+# Set permissions for workspace
 mkdir -p /workspace
-chown forgeuser:forgeuser /workspace
+chown -R forgeuser:forgeuser /workspace
 
-# Switch to forgeuser and run the rest
-su - forgeuser <<'EOF'
+# Switch to forgeuser for the rest of the setup
+sudo -u forgeuser bash << 'EOF'
+
 cd /workspace
-git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git
-cd stable-diffusion-webui-forge
 
+# Clone the Stable Diffusion WebUI Forge repo
+if [ ! -d "/workspace/stable-diffusion-webui-forge" ]; then
+  git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git /workspace/stable-diffusion-webui-forge
+fi
+
+cd /workspace/stable-diffusion-webui-forge
+
+# Create Python virtual environment
 python3 -m venv venv
-. venv/bin/activate
+source venv/bin/activate
 
+# Upgrade pip
 pip install --upgrade pip
-pip install -r requirements.txt || true  # continue if partial error
+
+# Install required packages
+pip install -r requirements.txt || true
+pip install -r requirements_extensions.txt || true
+
+# Install missing system dependencies
+pip install joblib protobuf==3.20.0 numpy==1.24.4
 
 # Download models
-mkdir -p models/Stable-diffusion
-wget -O models/Stable-diffusion/DreamShaper_v7.safetensors https://civitai.com/api/download/models/130072?type=Model&format=SafeTensor
-wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
+mkdir -p /workspace/stable-diffusion-webui-forge/models/Stable-diffusion
 
-# Launch web UI
-# Start the server and extract the share link
-python launch.py --xformers --api --share --port 7860 | tee /workspace/server.log | grep -oP 'https://[^\s]+' > /workspace/share_url.txt &
+wget -O /workspace/stable-diffusion-webui-forge/models/Stable-diffusion/DreamShaper_v7.safetensors \
+  https://civitai.com/api/download/models/128713
+
+wget -O /workspace/stable-diffusion-webui-forge/models/Stable-diffusion/RealisticVision_v5.1.safetensors \
+  "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
+
+# Make sure the script is executable
+chmod +x launch.py
+
+# Start the server and extract the share link to a file
+nohup python launch.py --xformers --api --share --port 7860 \
+  | tee /workspace/server.log \
+  | grep -oP 'https://[^"]+' > /workspace/share_url.txt &
 
 # After share URL is detected
 SHARE_URL=$(grep -oP 'https://[^\s]+' /workspace/share_url.txt | head -n 1)
