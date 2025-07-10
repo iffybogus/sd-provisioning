@@ -46,19 +46,19 @@ wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors \
 export MPLCONFIGDIR=/tmp
 export GRADIO_SERVER_PORT=7860
 
-# 9. Launch WebUI and capture public share URL with awk
-nohup python launch.py --xformers --api --share --port 7860 \
-  | tee /workspace/server.log \
-  | awk '/Running on public URL:/ { print $NF; fflush(); exit }' > /workspace/share_url.txt &
+# 9. Launch WebUI and stream logs
+nohup python launch.py --xformers --api --share --port 7860 > /workspace/server.log 2>&1 &
 
-# 10. Wait for share_url.txt to be populated
-while [ ! -s /workspace/share_url.txt ]; do
+# 10. Wait for the share URL to appear in logs
+while ! grep -q 'Running on public URL:' /workspace/server.log; do
     sleep 2
 done
 
-# 11. Read and send to n8n webhook
-SHARE_URL=$(cat /workspace/share_url.txt)
+# 11. Extract the URL
+SHARE_URL=$(grep -oP 'https://[^\s]+' /workspace/server.log | head -n 1)
+echo "$SHARE_URL" > /workspace/share_url.txt
 
+# 12. Send to n8n webhook
 curl -X POST http://n8n.ifeatuo.com/webhook/9b784c89-924a-40b0-a7b9-94b362020645 \
      -H "Content-Type: application/json" \
      -d "{\"share_url\": \"$SHARE_URL\"}"
