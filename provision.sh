@@ -29,5 +29,6 @@ wget -O models/Stable-diffusion/DreamShaper_v7.safetensors https://civitai.com/a
 wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
 
 # Launch web UI
-python launch.py --xformers --api --share --port 7860 &
+# Start the server and extract the share link
+python launch.py --xformers --api --share --port 7860 | tee /workspace/server.log | grep -oP 'https://[^\s]+' > /workspace/share_url.txt &
 EOF
