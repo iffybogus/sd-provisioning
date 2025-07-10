@@ -54,8 +54,8 @@ while ! grep -q 'Running on public URL:' /workspace/server.log; do
     sleep 2
 done
 
-# 11. Extract the URL
-SHARE_URL=$(grep -oP 'https://[^\s]+' /workspace/server.log | head -n 1)
+# 11. Extract only the Gradio public URL
+SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $NF }')
 echo "$SHARE_URL" > /workspace/share_url.txt
 
 # 12. Send to n8n webhook
