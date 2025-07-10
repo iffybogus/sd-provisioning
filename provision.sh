@@ -1,62 +1,50 @@
 #!/bin/bash
 
-# Exit on any error
 set -e
 
-# Create user 'forgeuser' with no password and no prompt
-useradd -m forgeuser || true
-
-# Give 'forgeuser' sudo privileges
-if ! grep -q '^forgeuser' /etc/sudoers; then
-  echo 'forgeuser ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# 1. Create user 'forgeuser' and set permissions
+if ! id "forgeuser" &>/dev/null; then
+    useradd -m forgeuser
 fi
-
-# Set permissions for workspace
-mkdir -p /workspace
 chown -R forgeuser:forgeuser /workspace
 
-# Switch to forgeuser for the rest of the setup
-sudo -u forgeuser bash << 'EOF'
-
+# 2. Switch to 'forgeuser'
+sudo -u forgeuser bash <<'EOF'
 cd /workspace
 
-# Clone the Stable Diffusion WebUI Forge repo
-if [ ! -d "/workspace/stable-diffusion-webui-forge" ]; then
-  git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git /workspace/stable-diffusion-webui-forge
-fi
+# 3. Clone Stable Diffusion WebUI Forge repo
+git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git
 
-cd /workspace/stable-diffusion-webui-forge
+cd stable-diffusion-webui-forge
 
-# Create Python virtual environment
+# 4. Create and activate Python virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Upgrade pip
+# 5. Upgrade pip and install required packages
 pip install --upgrade pip
+pip install -r requirements.txt || true  # Some will be pre-installed
 
-# Install required packages
-pip install -r requirements.txt || true
-pip install -r requirements_extensions.txt || true
+# 6. Install missing packages (due to version conflicts or errors)
+pip install joblib matplotlib protobuf==4.25.3 numpy==1.26.4
 
-# Install missing system dependencies
-pip install joblib protobuf==3.20.0 numpy==1.24.4
-
-# Download models
+# 7. Download DreamShaper and RealisticVision models
 mkdir -p /workspace/stable-diffusion-webui-forge/models/Stable-diffusion
 
+# DreamShaper v7
 wget -O /workspace/stable-diffusion-webui-forge/models/Stable-diffusion/DreamShaper_v7.safetensors \
-  https://civitai.com/api/download/models/128713
+  https://civitai.com/api/download/models/128713?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16
 
+# RealisticVision v5.1
 wget -O /workspace/stable-diffusion-webui-forge/models/Stable-diffusion/RealisticVision_v5.1.safetensors \
-  "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
+  https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16
 
-# Make sure the script is executable
-chmod +x launch.py
+# 8. Export variables to avoid permission warnings
+export MPLCONFIGDIR=/tmp
+export GRADIO_SERVER_PORT=7860
 
-# Start the server and extract the share link to a file
-nohup python launch.py --xformers --api --share --port 7860 \
-  | tee /workspace/server.log \
-  | grep -oP 'https://[^"]+' > /workspace/share_url.txt &
+# 9. Start server and extract Gradio share link
+python launch.py --xformers --api --share --port 7860 | tee /workspace/server.log | grep -oP 'https://[^\s]+' > /workspace/share_url.txt &
 
 # After share URL is detected
 SHARE_URL=$(grep -oP 'https://[^\s]+' /workspace/share_url.txt | head -n 1)
