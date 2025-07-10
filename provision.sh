@@ -31,4 +31,13 @@ wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors "https://civita
 # Launch web UI
 # Start the server and extract the share link
 python launch.py --xformers --api --share --port 7860 | tee /workspace/server.log | grep -oP 'https://[^\s]+' > /workspace/share_url.txt &
+
+# After share URL is detected
+SHARE_URL=$(grep -oP 'https://[^\s]+' /workspace/share_url.txt | head -n 1)
+
+# Send to n8n webhook
+curl -X POST http://n8n.ifeatuo.com/webhook/9b784c89-924a-40b0-a7b9-94b362020645 \
+     -H "Content-Type: application/json" \
+     -d "{\"share_url\": \"$SHARE_URL\"}"
+
 EOF
