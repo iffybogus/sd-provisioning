@@ -59,7 +59,7 @@ SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $
 echo "$SHARE_URL" > /workspace/share_url.txt
 
 # 12. Send to n8n webhook
-curl -X POST https://n8n.ifeatuo.com/webhook-test/9b784c89-924a-40b0-a7b9-94b362020645 \
+curl -X POST http://n8n.ifeatuo.com/webhook/9b784c89-924a-40b0-a7b9-94b362020645 \
      -H "Content-Type: application/json" \
      -d "{\"share_url\": \"$SHARE_URL\"}"
 
