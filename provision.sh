@@ -42,6 +42,10 @@ wget -O models/Stable-diffusion/DreamShaper_v7.safetensors \
 wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors \
   "https://civitai.com/api/download/models/501240?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors&size=pruned&fp=fp16"
 
+# SDXL Base 1.0
+wget -O models/Stable-diffusion/sd_xl_base_1.0.safetensors \
+  "https://civitai.com/api/download/models/126591?token=4962ef56501271d752e35f374e076419&type=Model&format=SafeTensors"
+
 # 8. Export variables to avoid permission warnings
 export MPLCONFIGDIR=/tmp
 export GRADIO_SERVER_PORT=7860
