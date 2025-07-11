@@ -72,10 +72,10 @@ export SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ 
 echo "$SHARE_URL" > /workspace/share_url.txt
 
 # Call the n8n webhook using the exported variable
-curl -G "http://n8n.ifeatuo.com/webhook-test/imagehooks" \
+curl -G "https://n8n.ifeatuo.com/webhook-test/imagehooks" \
      --data-urlencode "share_url=$SHARE_URL"
 
 # Call the n8n webhook using the exported variable
-curl -G "http://n8n.ifeatuo.com/webhook/imagehooks" \
+curl -G "https://n8n.ifeatuo.com/webhook/imagehooks" \
      --data-urlencode "share_url=$SHARE_URL"
 EOF
