@@ -65,16 +65,17 @@ while ! grep -q 'Running on public URL:' /workspace/server.log; do
     sleep 2
 done
 
-# 11. Extract and save the share URL
-SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $NF }')
+# Extract the share URL and export it as an environment variable
+export SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $NF }')
+
+# Save the URL to a file for logging or later use
 echo "$SHARE_URL" > /workspace/share_url.txt
 
-# 12. Notify n8n
+# Call the n8n webhook using the exported variable
 curl -G "http://n8n.ifeatuo.com/webhook-test/imagehooks" \
      --data-urlencode "share_url=$SHARE_URL"
 
-# 13. Notify n8n
+# Call the n8n webhook using the exported variable
 curl -G "http://n8n.ifeatuo.com/webhook/imagehooks" \
      --data-urlencode "share_url=$SHARE_URL"
-     
 EOF
