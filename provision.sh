@@ -70,13 +70,11 @@ SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $
 echo "$SHARE_URL" > /workspace/share_url.txt
 
 # 12. Notify n8n
-curl -X GET http://n8n.ifeatuo.com/webhook-test/imagehooks \
-     -H "Content-Type: application/json" \
-     -d "{\"share_url\": \"$SHARE_URL\"}"
+curl -G "http://n8n.ifeatuo.com/webhook-test/imagehooks" \
+     --data-urlencode "share_url=$SHARE_URL"
 
 # 13. Notify n8n
-curl -X GET http://n8n.ifeatuo.com/webhook/imagehooks \
-     -H "Content-Type: application/json" \
-     -d "{\"share_url\": \"$SHARE_URL\"}"
-
+curl -G "http://n8n.ifeatuo.com/webhook/imagehooks" \
+     --data-urlencode "share_url=$SHARE_URL"
+     
 EOF
