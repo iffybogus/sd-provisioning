@@ -38,8 +38,9 @@ id -u forgeuser &>/dev/null || useradd -m forgeuser
 rm -rf /workspace/SwarmUI
 su forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
 
-# Step 5: Build SwarmUI as forgeuser
-su forgeuser -c "cd /workspace/SwarmUI && dotnet publish -c Release -o publish"
+# Step 5: Build SwarmUI as forgeuser (fallback to build if publish fails)
+su forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish" || \
+  su forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet restore && dotnet build"
 
 # Step 6: Create WAN2.1 model folder and download models
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
@@ -62,41 +63,57 @@ wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan2.1
 VACE_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
 wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors "$VACE_MODEL_URL"
 
-# Step 7: Start SwarmUI server in background
-nohup su forgeuser -c "cd /workspace/SwarmUI/publish && dotnet SwarmUI.dll" > /workspace/swarmui.log 2>&1 &
+# Step 6.5: Create launch_gradio.py to wrap SwarmUI endpoints
+cat <<EOF > /workspace/SwarmUI/launch_gradio.py
+import gradio as gr
+import requests
 
-# Step 8: Install localtunnel to create Gradio-style public URL
-npm install -g localtunnel
+def call_api(endpoint="i2v", prompt="A dog running in the rain"):
+    url = f"http://localhost:5000/api/{endpoint}?prompt=" + prompt
+    try:
+        response = requests.get(url)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
 
-# Step 9: Start tunnel and capture public URL
-lt --port 7860 --print-requests > /tmp/lt_output.log &
-sleep 10
-PUBLIC_URL=$(grep -o 'https://[^ ]*' /tmp/lt_output.log | head -n 1)
+gr.Interface(
+    fn=call_api,
+    inputs=[
+        gr.Dropdown(choices=["i2v", "t2v", "vace"], label="Model"),
+        gr.Textbox(label="Prompt")
+    ],
+    outputs="json",
+    title="WAN 2.1 API Gateway"
+).launch(share=True, server_name="0.0.0.0", server_port=7860)
+EOF
 
-# Fallback if localtunnel fails
-if [[ -z "$PUBLIC_URL" ]]; then
-  PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+# Step 7: Launch SwarmUI with Gradio wrapper
+nohup su forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser python3 launch_gradio.py" > /workspace/gradio_output.log 2>&1 &
+
+# Step 8: Wait and extract Gradio public URL
+sleep 20
+PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
+
+# Step 9: Save and report to n8n webhook
+if [[ -n "$PUBLIC_URL" ]]; then
+  echo "$PUBLIC_URL" > /workspace/share_url.txt
+  curl -G https://n8n.ifeatuo.com/videohooks \
+       -H "Content-Type: application/json" \
+       --data-urlencode "share_url=$PUBLIC_URL"
 fi
 
-# Step 10: Save and report to n8n webhook
-echo "$PUBLIC_URL" > /workspace/share_url.txt
-
-curl -G https://n8n.ifeatuo.com/videohooks \
-     -H "Content-Type: application/json" \
-     --data-urlencode "share_url=$PUBLIC_URL"
-
-# Step 11: Add startup commands to rc.local for auto-boot
-echo '#!/bin/bash
-su forgeuser -c "cd /workspace/SwarmUI/publish && nohup dotnet SwarmUI.dll > /workspace/swarmui.log 2>&1 &"
-lt --port 7860 --print-requests > /tmp/lt_output.log &
-sleep 10
-PUBLIC_URL=$(grep -o "https://[^ ]*" /tmp/lt_output.log | head -n 1)
-if [[ -z "$PUBLIC_URL" ]]; then
-  PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+# Step 10: Add startup commands to rc.local for auto-boot
+cat <<'EORC' > /etc/rc.local
+#!/bin/bash
+su forgeuser -c "cd /workspace/SwarmUI && nohup python3 launch_gradio.py > /workspace/gradio_output.log 2>&1 &"
+sleep 20
+PUBLIC_URL=$(grep -o "https://.*\.gradio\.live" /workspace/gradio_output.log | head -n 1)
+if [[ -n "$PUBLIC_URL" ]]; then
+  echo "$PUBLIC_URL" > /workspace/share_url.txt
+  curl -G https://n8n.ifeatuo.com/videohooks --data-urlencode "share_url=$PUBLIC_URL"
 fi
-echo "$PUBLIC_URL" > /workspace/share_url.txt
-curl -G https://n8n.ifeatuo.com/videohooks --data-urlencode "share_url=$PUBLIC_URL"
-exit 0' > /etc/rc.local
+exit 0
+EORC
 
 chmod +x /etc/rc.local
 
