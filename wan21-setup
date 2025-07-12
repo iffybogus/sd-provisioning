@@ -3,7 +3,7 @@
 echo "[INFO] Starting WAN 2.1 provisioning..."
 
 # Step 0: DNS + Python environment
-echo -e 'nameserver 8.8.8.8\nnameserver 1.1.1.1' > /etc/resolv.conf
+echo -e 'nameserver 8.8.8.8\nnameserver 1.1.1.1' >> /etc/resolv.conf
 apt update && apt install -y python3 python3-pip
 
 if ! command -v python &> /dev/null; then
