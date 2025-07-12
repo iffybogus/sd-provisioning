@@ -20,6 +20,11 @@ apt update && apt install -y \
   nodejs \
   npm
 
+# Step 1.5: Check for Pinokio (optional)
+if [[ ! -d "/workspace/Pinokio" && ! -d "/root/Pinokio" ]]; then
+  echo "⚠️ Pinokio not found in expected locations. Continuing without Pinokio."
+fi
+
 # Step 2: Install .NET SDK 8.0 (skip if already installed)
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
 chmod +x /tmp/dotnet-install.sh
@@ -43,19 +48,19 @@ cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 HF_TOKEN="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"
 
 CV_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
-wget --header="Authorization: Bearer $HF_TOKEN" -O clip_vision_h.safetensors "$CV_MODEL_URL"
+wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O clip_vision_h.safetensors "$CV_MODEL_URL"
 
 VAE_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan_2.1_vae.safetensors "$VAE_MODEL_URL"
+wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan_2.1_vae.safetensors "$VAE_MODEL_URL"
 
 I2V_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safetensors "$I2V_MODEL_URL"
+wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safetensors "$I2V_MODEL_URL"
 
 T2V_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors "$T2V_MODEL_URL"
+wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors "$T2V_MODEL_URL"
 
 VACE_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors "$VACE_MODEL_URL"
+wget --tries=3 --timeout=30 --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors "$VACE_MODEL_URL"
 
 # Step 7: Start SwarmUI server in background
 nohup su forgeuser -c "cd /workspace/SwarmUI/publish && dotnet SwarmUI.dll" > /workspace/swarmui.log 2>&1 &
@@ -79,5 +84,20 @@ echo "$PUBLIC_URL" > /workspace/share_url.txt
 curl -G https://n8n.ifeatuo.com/videohooks \
      -H "Content-Type: application/json" \
      --data-urlencode "share_url=$PUBLIC_URL"
+
+# Step 11: Add startup commands to rc.local for auto-boot
+echo '#!/bin/bash
+su forgeuser -c "cd /workspace/SwarmUI/publish && nohup dotnet SwarmUI.dll > /workspace/swarmui.log 2>&1 &"
+lt --port 7860 --print-requests > /tmp/lt_output.log &
+sleep 10
+PUBLIC_URL=$(grep -o "https://[^ ]*" /tmp/lt_output.log | head -n 1)
+if [[ -z "$PUBLIC_URL" ]]; then
+  PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+fi
+echo "$PUBLIC_URL" > /workspace/share_url.txt
+curl -G https://n8n.ifeatuo.com/videohooks --data-urlencode "share_url=$PUBLIC_URL"
+exit 0' > /etc/rc.local
+
+chmod +x /etc/rc.local
 
 # End of script
