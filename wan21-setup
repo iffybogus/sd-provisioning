@@ -102,7 +102,22 @@ if [[ -n "$PUBLIC_URL" ]]; then
        --data-urlencode "share_url=$PUBLIC_URL"
 fi
 
-# Step 10: Add startup commands to rc.local for auto-boot
+# Step 10: Add background watchdog for bid status
+cat <<'EOF' > /workspace/watch_bid.sh
+#!/bin/bash
+while true; do
+  status=$(curl -s http://localhost:1337/status | jq -r '.outbid')
+  if [[ "$status" == "true" ]]; then
+    echo "Outbid detected. Shutting down."
+    shutdown now
+  fi
+  sleep 60
+done
+EOF
+chmod +x /workspace/watch_bid.sh
+nohup bash /workspace/watch_bid.sh > /workspace/watchdog.log 2>&1 &
+
+# Step 11: Add startup commands to rc.local for auto-boot
 cat <<'EORC' > /etc/rc.local
 #!/bin/bash
 su forgeuser -c "cd /workspace/SwarmUI && nohup python3 launch_gradio.py > /workspace/gradio_output.log 2>&1 &"
@@ -112,6 +127,7 @@ if [[ -n "$PUBLIC_URL" ]]; then
   echo "$PUBLIC_URL" > /workspace/share_url.txt
   curl -G https://n8n.ifeatuo.com/videohooks --data-urlencode "share_url=$PUBLIC_URL"
 fi
+nohup bash /workspace/watch_bid.sh > /workspace/watchdog.log 2>&1 &
 exit 0
 EORC
 
