@@ -1,18 +1,14 @@
 #!/bin/bash
 
-# WAN 2.1 PROVISIONING SCRIPT FOR VAST.AI INSTANCE
-# Auto-downloadable from GitHub and runs on startup
-# Target Image: vastai/linux-desktop:@vastai-automatic-tag
-# Purpose: Launch SwarmUI + WAN 2.1 with auto webhook notification to n8n
+# === Provisioning Script for WAN 2.1 on Vast.ai with Pinokio Integration ===
 
-set -e
+# Step 0: Vast.ai environment-specific variables
+export PROVISIONING_SCRIPT="https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/linux-desktop/provisioning_scripts/pinokio.sh"
+export SELKIES_ENCODER="x264enc"
+export PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:6100:16100:/:Selkies Low Latency Desktop|localhost:6200:16200:/guacamole:Apache Guacamole Desktop (VNC)|localhost:8080:8080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing"
+export DATA_DIRECTORY="/workspace/"
 
-# === 1. CREATE USER ===
-useradd -m -s /bin/bash forgeuser
-usermod -aG sudo forgeuser
-chown -R forgeuser:forgeuser /workspace
-
-# === 2. SYSTEM DEPENDENCIES ===
+# Step 1: Install dependencies
 apt update && apt install -y \
   git \
   curl \
@@ -20,52 +16,68 @@ apt update && apt install -y \
   unzip \
   sudo \
   software-properties-common \
-  openssh-client
+  openssh-client \
+  nodejs \
+  npm
 
-# === 3. DOTNET 8 SDK INSTALLATION ===
-wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
+# Step 2: Install .NET SDK 8.0 (skip if already installed)
+wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
 chmod +x /tmp/dotnet-install.sh
-/tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
-ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
+/tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet || echo ".NET install script completed with notice."
+ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet || echo "Symbolic link already exists."
 
-# === 4. INSTALL SWARMUI ===
-cd /workspace
-su - forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git"
-cd SwarmUI
-su - forgeuser -c "dotnet publish -c Release -o publish"
+# Step 3: Create forgeuser if it doesn't exist
+id -u forgeuser &>/dev/null || useradd -m forgeuser
 
-# === 5. DOWNLOAD WAN 2.1 MODELS ===
+# Step 4: Clone SwarmUI as forgeuser
+rm -rf /workspace/SwarmUI
+su forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
+
+# Step 5: Build SwarmUI as forgeuser
+su forgeuser -c "cd /workspace/SwarmUI && dotnet publish -c Release -o publish"
+
+# Step 6: Create WAN2.1 model folder and download models
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 
-# VAE, Clip, ClipVision, etc. (download in background)
-su - forgeuser -c "wget -q --show-progress -nc -r -np -nH --cut-dirs=5 -R 'index.html*' -e robots=off https://huggingface.co/Comfy-Org/Wan_2.1-ComfyUI_repackaged/tree/main/split_files/ -P ."
+HF_TOKEN="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"
 
-# === 6. START SWARMUI ===
-cat <<EOF > /workspace/start-swarmui.sh
-#!/bin/bash
-cd /workspace/SwarmUI/publish
-nohup dotnet SwarmUI.dll --urls http://0.0.0.0:7860 > /workspace/swarmui.log 2>&1 &
-EOF
-chmod +x /workspace/start-swarmui.sh
-su - forgeuser -c "/workspace/start-swarmui.sh"
+CV_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
+wget --header="Authorization: Bearer $HF_TOKEN" -O clip_vision_h.safetensors "$CV_MODEL_URL"
 
-# === 7. WAIT AND EXTRACT PUBLIC URL ===
-sleep 20  # wait for swarmui to startup
+VAE_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan_2.1_vae.safetensors "$VAE_MODEL_URL"
 
-# Use gradio --share output format, simulate the expected behavior
-PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+I2V_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safetensors "$I2V_MODEL_URL"
 
-# Export as environment variable (available in current shell context)
-export PUBLIC_URL
+T2V_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors "$T2V_MODEL_URL"
 
-# Write to file
+VACE_MODEL_URL="https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors "$VACE_MODEL_URL"
+
+# Step 7: Start SwarmUI server in background
+nohup su forgeuser -c "cd /workspace/SwarmUI/publish && dotnet SwarmUI.dll" > /workspace/swarmui.log 2>&1 &
+
+# Step 8: Install localtunnel to create Gradio-style public URL
+npm install -g localtunnel
+
+# Step 9: Start tunnel and capture public URL
+lt --port 7860 --print-requests > /tmp/lt_output.log &
+sleep 10
+PUBLIC_URL=$(grep -o 'https://[^ ]*' /tmp/lt_output.log | head -n 1)
+
+# Fallback if localtunnel fails
+if [[ -z "$PUBLIC_URL" ]]; then
+  PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+fi
+
+# Step 10: Save and report to n8n webhook
 echo "$PUBLIC_URL" > /workspace/share_url.txt
 
-# === 8. NOTIFY N8N WEBHOOK ===
-curl -G "https://n8n.ifeatuo.com/videohooks" \
+curl -G https://n8n.ifeatuo.com/videohooks \
+     -H "Content-Type: application/json" \
      --data-urlencode "share_url=$PUBLIC_URL"
 
-# === 9. DONE ===
-echo "Provisioning complete. WAN 2.1 launched at: $PUBLIC_URL"
-
+# End of script
