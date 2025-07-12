@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# WAN 2.1 PROVISIONING SCRIPT FOR VAST.AI INSTANCE
+# Auto-downloadable from GitHub and runs on startup
+# Target Image: vastai/linux-desktop:@vastai-automatic-tag
+# Purpose: Launch SwarmUI + WAN 2.1 with auto webhook notification to n8n
+
+set -e
+
+# === 1. CREATE USER ===
+useradd -m -s /bin/bash forgeuser
+usermod -aG sudo forgeuser
+chown -R forgeuser:forgeuser /workspace
+
+# === 2. SYSTEM DEPENDENCIES ===
+apt update && apt install -y \
+  git \
+  curl \
+  wget \
+  unzip \
+  sudo \
+  software-properties-common \
+  openssh-client
+
+# === 3. DOTNET 8 SDK INSTALLATION ===
+wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
+chmod +x /tmp/dotnet-install.sh
+/tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
+ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
+
+# === 4. INSTALL SWARMUI ===
+cd /workspace
+su - forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git"
+cd SwarmUI
+su - forgeuser -c "dotnet publish -c Release -o publish"
+
+# === 5. DOWNLOAD WAN 2.1 MODELS ===
+mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+
+# VAE, Clip, ClipVision, etc. (download in background)
+su - forgeuser -c "wget -q --show-progress -nc -r -np -nH --cut-dirs=5 -R 'index.html*' -e robots=off https://huggingface.co/Comfy-Org/Wan_2.1-ComfyUI_repackaged/tree/main/split_files/ -P ."
+
+# === 6. START SWARMUI ===
+cat <<EOF > /workspace/start-swarmui.sh
+#!/bin/bash
+cd /workspace/SwarmUI/publish
+nohup dotnet SwarmUI.dll --urls http://0.0.0.0:7860 > /workspace/swarmui.log 2>&1 &
+EOF
+chmod +x /workspace/start-swarmui.sh
+su - forgeuser -c "/workspace/start-swarmui.sh"
+
+# === 7. WAIT AND EXTRACT PUBLIC URL ===
+sleep 20  # wait for swarmui to startup
+
+# Use gradio --share output format, simulate the expected behavior
+PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
+
+# === 8. NOTIFY N8N WEBHOOK ===
+curl -G "https://n8n.ifeatuo.com/videohooks" \
+     --data-urlencode "share_url=$PUBLIC_URL"
+
+# === 9. DONE ===
+echo "Provisioning complete. WAN 2.1 launched at: $PUBLIC_URL"
+
