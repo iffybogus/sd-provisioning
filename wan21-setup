@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "[INFO] Starting provisioning..."
+echo "[INFO] Starting WAN 2.1 provisioning..."
 
-# Step 0: DNS and Python setup
-echo "[INFO] Updating DNS and verifying Python..."
+# Step 0: DNS + Python environment
+echo "[INFO] Configuring DNS and ensuring Python is set up..."
 echo -e 'nameserver 8.8.8.8\nnameserver 1.1.1.1' > /etc/resolv.conf
 apt update && apt install -y python3 python3-pip
 
@@ -12,17 +12,24 @@ if ! command -v python &> /dev/null; then
   ln -s "$(command -v python3)" /usr/bin/python
 fi
 
-# Step 1: Install system dependencies
+# Step 0.5: Gradio writable cache/temp directories
+export GRADIO_FRPC_BINARY=/usr/local/bin/frpc_gradio
+export GRADIO_CACHE_DIR=/workspace/.gradio
+export GRADIO_TEMP_DIR=/workspace/.gradio
+mkdir -p /workspace/.gradio
+chmod 777 /workspace/.gradio
+echo "[INFO] Gradio environment variables configured."
+
+# Step 1: Install base dependencies
 apt install -y git curl wget unzip sudo software-properties-common openssh-client nodejs npm jq
 
 # Step 2: Install Gradio
 pip3 install gradio
 
-# Step 3: Install Gradio tunnel binary globally
+# Step 3: Install Gradio share tunnel binary globally
 wget -q --show-progress -O /usr/local/bin/frpc_gradio \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /usr/local/bin/frpc_gradio
-export GRADIO_FRPC_BINARY=/usr/local/bin/frpc_gradio
 
 # Step 4: Install .NET SDK
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
@@ -30,13 +37,13 @@ chmod +x /tmp/dotnet-install.sh
 /tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Step 5: Create user and clone SwarmUI
+# Step 5: Add forgeuser and clone SwarmUI
 id -u forgeuser &>/dev/null || useradd -m forgeuser
 rm -rf /workspace/SwarmUI
 su forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
 su forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
 
-# Step 6: Download WAN2.1 models
+# Step 6: Download WAN 2.1 models
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 HF_TOKEN="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"
@@ -47,12 +54,14 @@ wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safe
 wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors
 wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
 
-# Step 7: Create Gradio wrapper
+# Step 7: Create launch_gradio.py
 cat <<EOF > /workspace/SwarmUI/launch_gradio.py
 import gradio as gr
 import requests
 import os
 os.environ['GRADIO_FRPC_BINARY'] = '/usr/local/bin/frpc_gradio'
+os.environ['GRADIO_CACHE_DIR'] = '/workspace/.gradio'
+os.environ['GRADIO_TEMP_DIR'] = '/workspace/.gradio'
 
 def call_api(endpoint="i2v", prompt="A dog running in the rain"):
     url = f"http://localhost:5000/api/{endpoint}?prompt=" + prompt
@@ -64,14 +73,22 @@ def call_api(endpoint="i2v", prompt="A dog running in the rain"):
 
 gr.Interface(
     fn=call_api,
-    inputs=[gr.Dropdown(["i2v", "t2v", "vace"]), gr.Textbox(label="Prompt")],
+    inputs=[
+        gr.Dropdown(["i2v", "t2v", "vace"], label="Model"),
+        gr.Textbox(label="Prompt")
+    ],
     outputs="json",
     title="WAN 2.1 API Gateway"
 ).launch(share=True, server_name="0.0.0.0", server_port=7860)
 EOF
 
-# Step 8: Launch Gradio and report public URL
-nohup su forgeuser -c "cd /workspace/SwarmUI && python3 launch_gradio.py" > /workspace/gradio_output.log 2>&1 &
+# Step 8: Launch Gradio and capture public URL
+nohup su forgeuser -c "cd /workspace/SwarmUI && \
+GRADIO_CACHE_DIR=/workspace/.gradio \
+GRADIO_TEMP_DIR=/workspace/.gradio \
+GRADIO_FRPC_BINARY=/usr/local/bin/frpc_gradio \
+python3 launch_gradio.py" > /workspace/gradio_output.log 2>&1 &
+
 sleep 20
 PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
 echo "$PUBLIC_URL" > /workspace/share_url.txt
@@ -82,7 +99,7 @@ if [[ -n "$PUBLIC_URL" ]]; then
        --data-urlencode "share_url=$PUBLIC_URL"
 fi
 
-# Step 9: Watchdog script for outbid
+# Step 9: Launch watchdog to monitor outbid status
 cat <<'EOF' > /workspace/watch_bid.sh
 #!/bin/bash
 while true; do
