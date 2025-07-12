@@ -56,6 +56,12 @@ sleep 20  # wait for swarmui to startup
 # Use gradio --share output format, simulate the expected behavior
 PUBLIC_URL="http://$(curl -s ifconfig.me):7860"
 
+# Export as environment variable (available in current shell context)
+export PUBLIC_URL
+
+# Write to file
+echo "$PUBLIC_URL" > /workspace/share_url.txt
+
 # === 8. NOTIFY N8N WEBHOOK ===
 curl -G "https://n8n.ifeatuo.com/videohooks" \
      --data-urlencode "share_url=$PUBLIC_URL"
