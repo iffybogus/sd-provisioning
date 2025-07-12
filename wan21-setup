@@ -29,12 +29,13 @@ if [[ ! -d "/workspace/Pinokio" && ! -d "/root/Pinokio" ]]; then
   echo "⚠️ Pinokio not found in expected locations. Continuing without Pinokio."
 fi
 
-# Step 1.6: Pre-install gradio frpc tunnel client (to avoid share failure)
-mkdir -p /home/forgeuser/.cache/huggingface/gradio/frpc
-wget -O /home/forgeuser/.cache/huggingface/gradio/frpc/frpc_linux_amd64_v0.3 \
-  https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
-chmod +x /home/forgeuser/.cache/huggingface/gradio/frpc/frpc_linux_amd64_v0.3
-chown -R forgeuser:forgeuser /home/forgeuser/.cache
+# Step 1.6: Pre-install gradio frpc tunnel client as forgeuser
+su - forgeuser -c "
+  mkdir -p /home/forgeuser/.cache/huggingface/gradio/frpc && \
+  wget -O /home/forgeuser/.cache/huggingface/gradio/frpc/frpc_linux_amd64_v0.3 \
+    https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 && \
+  chmod +x /home/forgeuser/.cache/huggingface/gradio/frpc/frpc_linux_amd64_v0.3
+"
 
 # Step 2: Install .NET SDK 8.0 (skip if already installed)
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
