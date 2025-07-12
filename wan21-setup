@@ -3,7 +3,8 @@
 echo "[INFO] Starting WAN 2.1 provisioning..."
 
 # Step 0: DNS + Python environment
-echo -e 'nameserver 8.8.8.8\nnameserver 1.1.1.1' >> /etc/resolv.conf
+echo -e 'nameserver 8.8.8.8
+nameserver 1.1.1.1' >> /etc/resolv.conf
 apt update && apt install -y python3 python3-pip
 
 if ! command -v python &> /dev/null; then
@@ -17,8 +18,7 @@ chmod -R 777 /workspace/.gradio
 mkdir -p /root/.cache/huggingface/gradio
 chmod -R 777 /root/.cache/huggingface/gradio
 
-wget -q --show-progress -O /usr/local/bin/frpc_gradio \
-  https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
+wget -q --show-progress -O /usr/local/bin/frpc_gradio   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /usr/local/bin/frpc_gradio
 
 export GRADIO_FRPC_BINARY="/usr/local/bin/frpc_gradio"
@@ -85,20 +85,14 @@ gr.Interface(
 EOF
 
 # Step 7: Launch Gradio + report share link
-nohup su forgeuser -c "cd /workspace/SwarmUI && \
-GRADIO_FRPC_BINARY=/usr/local/bin/frpc_gradio \
-GRADIO_CACHE_DIR=/workspace/.gradio \
-GRADIO_TEMP_DIR=/workspace/.gradio \
-python3 launch_gradio.py" > /workspace/gradio_output.log 2>&1 &
+nohup su forgeuser -c "cd /workspace/SwarmUI && GRADIO_FRPC_BINARY=/usr/local/bin/frpc_gradio GRADIO_CACHE_DIR=/workspace/.gradio GRADIO_TEMP_DIR=/workspace/.gradio HOME=/home/forgeuser python3 launch_gradio.py" > /workspace/gradio_output.log 2>&1 &
 
 sleep 20
 PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
 echo "$PUBLIC_URL" > /workspace/share_url.txt
 
 if [[ -n "$PUBLIC_URL" ]]; then
-  curl -G https://n8n.ifeatuo.com/videohooks \
-       -H "Content-Type: application/json" \
-       --data-urlencode "share_url=$PUBLIC_URL"
+  curl -G https://n8n.ifeatuo.com/videohooks        -H "Content-Type: application/json"        --data-urlencode "share_url=$PUBLIC_URL"
 fi
 
 # Step 8: Watchdog for outbid termination
