@@ -23,7 +23,7 @@ apt install -y git curl wget unzip sudo software-properties-common openssh-clien
 
 # Step 2: Install Gradio as forgeuser
 id -u forgeuser &>/dev/null || useradd -m forgeuser
-su - forgeuser -c "pip3 install gradio"
+su - forgeuser -c "/usr/bin/pip3 install --user gradio"
 
 # Step 3: .NET SDK for SwarmUI
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
@@ -53,6 +53,7 @@ import os
 os.environ['GRADIO_FRPC_BINARY'] = '/workspace/.gradio/frpc/frpc_linux_amd64_v0.3'
 os.environ['GRADIO_CACHE_DIR'] = '/workspace/.gradio'
 os.environ['GRADIO_TEMP_DIR'] = '/workspace/.gradio'
+os.environ['PYTHONPATH'] = '/home/forgeuser/.local/lib/python3.10/site-packages'
 
 import gradio as gr
 import requests
@@ -81,6 +82,7 @@ nohup su - forgeuser -c '
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
+export PYTHONPATH=/home/forgeuser/.local/lib/python3.10/site-packages
 cd /workspace/SwarmUI
 python3 launch_gradio.py
 ' > /workspace/gradio_output.log 2>&1 &
@@ -118,6 +120,7 @@ su - forgeuser -c '
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
+export PYTHONPATH=/home/forgeuser/.local/lib/python3.10/site-packages
 cd /workspace/SwarmUI
 nohup python3 launch_gradio.py > /workspace/gradio_output.log 2>&1 &
 '
