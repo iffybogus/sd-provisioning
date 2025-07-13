@@ -26,7 +26,7 @@ fi
 mkdir -p /workspace/.gradio/frpc
 chmod -R 777 /workspace/.gradio
 
-wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
+wget -q -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
