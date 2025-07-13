@@ -25,7 +25,7 @@ wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
 # Step 3: Install Gradio as forgeuser
-su - forgeuser -c "pip3 install --user gradio"
+su - forgeuser -c "HOME=/home/forgeuser pip3 install --user gradio"
 
 # Step 4: Install .NET SDK
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
@@ -83,7 +83,7 @@ export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
 cd /workspace/SwarmUI
-python3 launch_gradio.py
+HOME=/home/forgeuser python3 launch_gradio.py
 ' >> /workspace/gradio_output.log 2>&1 &
 
 sleep 20
@@ -120,7 +120,7 @@ export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
 cd /workspace/SwarmUI
-nohup python3 launch_gradio.py >> /workspace/gradio_output.log 2>&1 &
+HOME=/home/forgeuser nohup python3 launch_gradio.py >> /workspace/gradio_output.log 2>&1 &
 '
 sleep 20
 PUBLIC_URL=$(grep -o "https://.*\.gradio\.live" /workspace/gradio_output.log | head -n 1)
