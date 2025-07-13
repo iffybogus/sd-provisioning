@@ -15,12 +15,14 @@ if ! command -v python &> /dev/null; then
 fi
 
 # Step 2: Gradio setup and binary
+su - forgeuser -c '
 mkdir -p /workspace/.gradio/frpc
 chmod -R 777 /workspace/.gradio
 
 wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
+'
 
 # Step 3: Install Gradio as forgeuser
 su - forgeuser -c "pip3 install --user gradio"
