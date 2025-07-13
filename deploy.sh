@@ -43,7 +43,8 @@ ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
 # Step 6: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
-mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+ls -la /workspace/SwarmUI
+# mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 
 wget -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
@@ -64,6 +65,7 @@ EOF
 
 # Step 7.5: Launch backend API on port 5000
 nohup su - user -c '
+ls -la /workspace/SwarmUI/src/bin
 cd /workspace/SwarmUI/src/bin/live_release
 export ASPNETCORE_URLS=http://0.0.0.0:5000
 dotnet SwarmUI.dll &
