@@ -3,11 +3,17 @@ set -e
 set -x
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
+# Step -1: Set DNS resolvers
+echo -e 'nameserver 8.8.8.8\nnameserver 1.1.1.1' > /etc/resolv.conf
+
 # Step 0: Create user and setup permissions
 if ! id "forgeuser" &>/dev/null; then
     useradd -m forgeuser
 fi
 chown -R forgeuser:forgeuser /workspace
+
+# Add .local/bin to PATH for forgeuser
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/forgeuser/.bashrc
 
 # Step 1: Install dependencies
 apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq
@@ -38,16 +44,16 @@ su - forgeuser -c "rm -rf /workspace/SwarmUI && git clone https://github.com/mcm
 su - forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
 
 # Step 6: Download WAN2.1 models
-su - forgeuser -c '
+HF_TOKEN=$(cat /root/.hf_token)
+su - forgeuser -c "
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
-HF_TOKEN="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"
-wget --header="Authorization: Bearer $HF_TOKEN" -O clip_vision_h.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan_2.1_vae.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors
-wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
-'
+wget --header='Authorization: Bearer $HF_TOKEN' -O clip_vision_h.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+wget --header='Authorization: Bearer $HF_TOKEN' -O wan_2.1_vae.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
+wget --header='Authorization: Bearer $HF_TOKEN' -O wan2.1_i2v_720p_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors
+wget --header='Authorization: Bearer $HF_TOKEN' -O wan2.1_t2v_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors
+wget --header='Authorization: Bearer $HF_TOKEN' -O wan2.1_vace_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
+"
 
 # Step 7: Create launch_gradio.py as forgeuser
 su - forgeuser -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
@@ -116,6 +122,7 @@ nohup bash /workspace/watch_bid.sh >> /workspace/watchdog.log 2>&1 &
 cat <<'EORC' > /etc/rc.local
 #!/bin/bash
 su - forgeuser -c '
+export PATH="$HOME/.local/bin:$PATH"
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
