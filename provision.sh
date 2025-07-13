@@ -1,81 +1,135 @@
 #!/bin/bash
 set -e
 
-# 1. Create user 'forgeuser' and set permissions
+# Step 0: Create user and setup permissions
 if ! id "forgeuser" &>/dev/null; then
     useradd -m forgeuser
 fi
 chown -R forgeuser:forgeuser /workspace
 
-# 2. Install system dependencies
-apt update
-apt install -y python3 python3-pip git-lfs wget curl
+# Step 1: Install dependencies
+apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq
 
-# Create 'python' alias if missing
 if ! command -v python &> /dev/null; then
-    ln -s /usr/bin/python3 /usr/bin/python
+  ln -s /usr/bin/python3 /usr/bin/python
 fi
 
-# 3. Switch to 'forgeuser' for environment setup
-sudo -u forgeuser bash <<'EOF'
+# Step 2: Gradio setup and binary
+mkdir -p /workspace/.gradio/frpc
+chmod -R 777 /workspace/.gradio
 
-cd /workspace
+wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
+  https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
+chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
-# 4. Clone WebUI Forge repo
-if [ ! -d "stable-diffusion-webui-forge" ]; then
-    git clone https://github.com/lllyasviel/stable-diffusion-webui-forge.git
+# Step 3: Install Gradio as forgeuser
+su - forgeuser -c "pip3 install --user gradio"
+
+# Step 4: Install .NET SDK
+wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
+chmod +x /tmp/dotnet-install.sh
+/tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
+ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
+
+# Step 5: Clone and build SwarmUI
+su - forgeuser -c "rm -rf /workspace/SwarmUI && git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
+su - forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
+
+# Step 6: Download WAN2.1 models
+su - forgeuser -c '
+mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+HF_TOKEN="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"
+wget --header="Authorization: Bearer $HF_TOKEN" -O clip_vision_h.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan_2.1_vae.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_i2v_720p_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_t2v_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors
+wget --header="Authorization: Bearer $HF_TOKEN" -O wan2.1_vace_14B_fp16.safetensors https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
+'
+
+# Step 7: Create launch_gradio.py as forgeuser
+su - forgeuser -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
+import os
+os.environ["GRADIO_FRPC_BINARY"] = "/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
+os.environ["GRADIO_CACHE_DIR"] = "/workspace/.gradio"
+os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
+import gradio as gr
+import requests
+
+def call_api(endpoint="i2v", prompt="A dog running in the rain"):
+    url = f"http://localhost:5000/api/{endpoint}?prompt=" + prompt
+    try:
+        response = requests.get(url)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+gr.Interface(
+    fn=call_api,
+    inputs=[
+        gr.Dropdown(["i2v", "t2v", "vace"], label="Model"),
+        gr.Textbox(label="Prompt")
+    ],
+    outputs="json",
+    title="WAN 2.1 API Gateway"
+).launch(share=True, server_name="0.0.0.0", server_port=7860)
+EOF'
+
+# Step 8: Launch Gradio as forgeuser
+nohup su - forgeuser -c '
+export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
+export GRADIO_CACHE_DIR=/workspace/.gradio
+export GRADIO_TEMP_DIR=/workspace/.gradio
+cd /workspace/SwarmUI
+python3 launch_gradio.py
+' > /workspace/gradio_output.log 2>&1 &
+
+sleep 20
+PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
+echo "$PUBLIC_URL" > /workspace/share_url.txt
+
+if [[ -n "$PUBLIC_URL" ]]; then
+  curl -G https://n8n.ifeatuo.com/videohooks \
+       -H "Content-Type: application/json" \
+       --data-urlencode "share_url=$PUBLIC_URL"
 fi
 
-cd stable-diffusion-webui-forge
-
-# 5. Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# 6. Upgrade pip and install dependencies inside venv
-pip install --upgrade pip
-pip install -r requirements.txt || true
-pip install joblib matplotlib protobuf==4.25.3 numpy==1.26.4
-
-# 7. Download models
-mkdir -p models/Stable-diffusion
-mkdir -p models/Lora
-
-# 🎨 DreamShaper v7
-wget -O models/Stable-diffusion/DreamShaper_v7.safetensors \
-  "https://huggingface.co/digiplay/DreamShaper_7/resolve/main/dreamshaper_7.safetensors"
-
-# 👁️ RealisticVision v5.1
-wget -O models/Stable-diffusion/RealisticVision_v5.1.safetensors \
-  "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1.safetensors"
-
-# 🧠 Josef Koudelka Style LoRA
-wget -O models/Lora/Josef_Koudelka_Style_SDXL.safetensors \
-  "https://huggingface.co/TheLastBen/Josef_Koudelka_Style_SDXL/resolve/main/koud.safetensors"
-
-# 8. Export runtime configs
-export MPLCONFIGDIR=/tmp
-export GRADIO_SERVER_PORT=7860
-
-# 9. Launch Forge
-nohup python launch.py --xformers --api --share --port 7860 > /workspace/server.log 2>&1 &
-
-# 10. Wait for Gradio public URL
-while ! grep -q 'Running on public URL:' /workspace/server.log; do
-    sleep 2
+# Step 9: Watchdog for outbid termination
+cat <<'EOF' > /workspace/watch_bid.sh
+#!/bin/bash
+while true; do
+  status=$(curl -s http://localhost:1337/status | jq -r '.outbid')
+  if [[ "$status" == "true" ]]; then
+    echo "Outbid detected. Shutting down."
+    shutdown now
+  fi
+  sleep 60
 done
-
-# Extract the share URL and export it as an environment variable
-export SHARE_URL=$(grep "Running on public URL:" /workspace/server.log | awk '{ print $NF }')
-
-# Save the URL to a file for logging or later use
-echo "$SHARE_URL" > /workspace/share_url.txt
-
-# Call the n8n webhook using the exported variable
-curl -G "https://n8n.ifeatuo.com/webhook-test/imagehooks" \
-     --data-urlencode "share_url=$SHARE_URL"
-
-# Call the n8n webhook using the exported variable
-curl -G "https://n8n.ifeatuo.com/webhook/imagehooks" \
-     --data-urlencode "share_url=$SHARE_URL"
 EOF
+
+chmod +x /workspace/watch_bid.sh
+nohup bash /workspace/watch_bid.sh > /workspace/watchdog.log 2>&1 &
+
+# Step 10: Enable auto-launch via rc.local
+cat <<'EORC' > /etc/rc.local
+#!/bin/bash
+su - forgeuser -c '
+export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
+export GRADIO_CACHE_DIR=/workspace/.gradio
+export GRADIO_TEMP_DIR=/workspace/.gradio
+cd /workspace/SwarmUI
+nohup python3 launch_gradio.py > /workspace/gradio_output.log 2>&1 &
+'
+sleep 20
+PUBLIC_URL=$(grep -o "https://.*\.gradio\.live" /workspace/gradio_output.log | head -n 1)
+export PUBLIC_URL
+if [[ -n "$PUBLIC_URL" ]]; then
+  echo "$PUBLIC_URL" > /workspace/share_url.txt
+  curl -G https://n8n.ifeatuo.com/videohooks --data-urlencode "share_url=$PUBLIC_URL"
+fi
+nohup bash /workspace/watch_bid.sh > /workspace/watchdog.log 2>&1 &
+exit 0
+EORC
+chmod +x /etc/rc.local
+
+echo "[INFO] Provisioning complete."
