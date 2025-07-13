@@ -30,8 +30,8 @@ wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
-# Step 3: Install Gradio as forgeuser
-su - forgeuser -c "HOME=/home/forgeuser pip3 install --user gradio"
+# Step 3: Install Gradio as forgeuser with PATH
+su - forgeuser -c "export PATH=\"\$HOME/.local/bin:\$PATH\" && HOME=/home/forgeuser pip3 install --user gradio"
 
 # Step 4: Install .NET SDK
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
@@ -43,8 +43,8 @@ ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 su - forgeuser -c "rm -rf /workspace/SwarmUI && git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
 su - forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
 
-# Step 6: Download WAN2.1 models
-HF_TOKEN=$(cat /root/.hf_token)
+# Step 6: Download WAN2.1 models with embedded HF token
+export HF_TOKEN="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"
 su - forgeuser -c "
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
@@ -85,6 +85,7 @@ EOF'
 
 # Step 8: Launch Gradio as forgeuser
 nohup su - forgeuser -c '
+export PATH="$HOME/.local/bin:$PATH"
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
