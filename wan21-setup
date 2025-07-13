@@ -18,15 +18,12 @@ wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
-export GRADIO_CACHE_DIR="/workspace/.gradio"
-export GRADIO_TEMP_DIR="/workspace/.gradio"
-export GRADIO_FRPC_BINARY="/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
-
 # Step 1: Install dependencies
 apt install -y git curl wget unzip sudo software-properties-common openssh-client nodejs npm jq
 
-# Step 2: Install Gradio
-pip3 install gradio
+# Step 2: Install Gradio as forgeuser
+id -u forgeuser &>/dev/null || useradd -m forgeuser
+su - forgeuser -c "pip3 install gradio"
 
 # Step 3: .NET SDK for SwarmUI
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
@@ -34,11 +31,9 @@ chmod +x /tmp/dotnet-install.sh
 /tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Step 4: Create user + clone SwarmUI
-id -u forgeuser &>/dev/null || useradd -m forgeuser
-rm -rf /workspace/SwarmUI
-su forgeuser -c "git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
-su forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
+# Step 4: Clone and build SwarmUI as forgeuser
+su - forgeuser -c "rm -rf /workspace/SwarmUI && git clone https://github.com/mcmonkeyprojects/SwarmUI.git /workspace/SwarmUI"
+su - forgeuser -c "cd /workspace/SwarmUI && HOME=/home/forgeuser dotnet publish -c Release -o publish || dotnet build"
 
 # Step 5: Download WAN2.1 models
 mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
@@ -82,7 +77,7 @@ gr.Interface(
 EOF
 
 # Step 7: Launch Gradio + report share link
-nohup su forgeuser -c '
+nohup su - forgeuser -c '
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
@@ -119,7 +114,7 @@ nohup bash /workspace/watch_bid.sh > /workspace/watchdog.log 2>&1 &
 # Step 9: Enable auto-launch via rc.local
 cat <<'EORC' > /etc/rc.local
 #!/bin/bash
-su forgeuser -c '
+su - forgeuser -c '
 export GRADIO_FRPC_BINARY=/workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 export GRADIO_CACHE_DIR=/workspace/.gradio
 export GRADIO_TEMP_DIR=/workspace/.gradio
