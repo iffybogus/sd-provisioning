@@ -43,6 +43,7 @@ ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 # Step 5.5: Upgrade SwarmUI to v0.9.6-Beta
 echo "[INFO] Upgrading SwarmUI to latest release..."
 cd /workspace/SwarmUI
+git config --global --add safe.directory /workspace/SwarmUI
 if [ -d .git ]; then
     git pull
     echo "[INFO] SwarmUI successfully updated to latest version."
