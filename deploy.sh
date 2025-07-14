@@ -85,8 +85,8 @@ import requests
 def call_api(endpoint="i2v", prompt="A dog running in the rain"):
     url = f"http://localhost:5000/api/{endpoint}"
     payload = {
-        "session": "test-session-id",  # REQUIRED FIELD
-        "data": [prompt]               # Still needs to be a list
+        "session": "gradio-test-session",
+        "data": [prompt]
     }
     try:
         response = requests.post(url, json=payload)
