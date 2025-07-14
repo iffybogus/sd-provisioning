@@ -45,11 +45,13 @@ echo "[INFO] Upgrading SwarmUI to latest release..."
 cd /workspace/SwarmUI
 git config --global --add safe.directory /workspace/SwarmUI
 if [ -d .git ]; then
-    git pull
+    git checkout master
+    git pull origin master
     echo "[INFO] SwarmUI successfully updated to latest version."
 else
     echo "[WARNING] SwarmUI directory is missing a Git repo — skipping upgrade."
 fi
+
 
 # Step 5.6: Rebuild SwarmUI backend with .NET (required for v0.9.6+ changes)
 cd /workspace/SwarmUI
