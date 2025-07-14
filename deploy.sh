@@ -56,7 +56,11 @@ fi
 # Step 5.6: Rebuild SwarmUI backend with .NET (required for v0.9.6+ changes)
 cd /workspace/SwarmUI
 echo "[INFO] Rebuilding SwarmUI backend..."
-dotnet publish -c Release -o src/bin/live_release/
+# dotnet publish -c Release -o src/bin/live_release/
+
+# Step 5.7: Install FreneticUtilities dependency
+dotnet add /workspace/SwarmUI/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
+dotnet publish -c Release -o /workspace/SwarmUI/src/bin/live_release/
 
 # Step 6: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
