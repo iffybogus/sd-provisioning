@@ -80,17 +80,18 @@ import time
 import json
 import requests
 import gradio as gr
+from glob import glob
 
-# Gradio + Tunnel Environment Setup
+# Setup environment variables for Gradio + FRPC
 os.environ["GRADIO_FRPC_BINARY"] = "/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
 os.environ["GRADIO_CACHE_DIR"] = "/workspace/.gradio"
 os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
 
-# Use timestamp-based session for uniqueness
+# Generate unique session ID
 session = f"gradio-session-{int(time.time())}"
-workflow_name = "text_to_video_wan.json"  # Can be made dynamic
+workflow_name = "text_to_video_wan.json"
 
-# Start session with workflow before first API call
+# Attempt to start session on launch
 def start_session():
     url = "http://localhost:5000/api/session/start"
     payload = {"session": session, "workflow": workflow_name}
@@ -99,19 +100,24 @@ def start_session():
         print("Session start response:", response.text)
         return response.status_code == 200
     except Exception as e:
-        print("[ERROR] Failed to start session:", e)
+        print("[ERROR] Session boot failed:", e)
         return False
 
 session_started = start_session()
 
-def call_api(endpoint="i2v", prompt="A dog running in the rain"):
-    url = f"http://localhost:5000/api/{endpoint}"
-    payload = {
-        "session": session,
-        "data": [prompt]
-    }
+# Function to fetch latest video from output folder
+def fetch_latest_video():
+    files = sorted(glob("/workspace/SwarmUI/output/*.mp4"), key=os.path.getmtime, reverse=True)
+    return files[0] if files else None
 
-    # Log request locally
+# Main prompt processing logic
+def call_api(endpoint="i2v", prompt="A dog running in the rain"):
+    if not session_started:
+        return {"error": "Session initialization failed. The backend workflow could not be started."}
+
+    url = f"http://localhost:5000/api/{endpoint}"
+    payload = {"session": session, "data": [prompt]}
+
     try:
         with open("/workspace/request_log.json", "a") as log_file:
             log_file.write(json.dumps({
@@ -123,23 +129,32 @@ def call_api(endpoint="i2v", prompt="A dog running in the rain"):
     except Exception as log_error:
         print(f"[LOGGING ERROR] {log_error}")
 
-    # Send the request
     try:
         response = requests.post(url, json=payload)
         print("Raw response:", response.text)
-        return response.json()
+        data = response.json()
+        return data
     except Exception as e:
         return {"error": str(e)}
 
-gr.Interface(
-    fn=call_api,
-    inputs=[
-        gr.Dropdown(["i2v", "t2v", "vace"], label="Model"),
-        gr.Textbox(label="Prompt")
-    ],
-    outputs="json",
-    title="WAN 2.1 API Gateway"
-).queue().launch(share=True, server_name="0.0.0.0", server_port=7860)
+# Wrap Gradio UI with video preview section
+with gr.Blocks() as demo:
+    gr.Markdown("## WAN 2.1 API Gateway")
+    with gr.Row():
+        model_dropdown = gr.Dropdown(choices=["i2v", "t2v", "vace"], label="Model", value="t2v")
+        prompt_input = gr.Textbox(label="Prompt", value="monkey in a tree")
+    output_display = gr.JSON(label="API Response")
+    video_preview = gr.Video(label="Latest Output", interactive=True)
+
+    def run_all(endpoint, prompt):
+        result = call_api(endpoint, prompt)
+        video = fetch_latest_video()
+        return result, video
+
+    run_button = gr.Button("Generate")
+    run_button.click(fn=run_all, inputs=[model_dropdown, prompt_input], outputs=[output_display, video_preview])
+
+demo.queue().launch(share=True, server_name="0.0.0.0", server_port=7860)
 EOF'
 
 # Step 9: Launch Gradio
