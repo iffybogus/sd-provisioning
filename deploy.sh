@@ -101,7 +101,7 @@ gr.Interface(
     ],
     outputs="json",
     title="WAN 2.1 API Gateway"
-).launch(share=True, server_name="0.0.0.0", server_port=7860)
+).queue().launch(share=True, server_name="0.0.0.0", server_port=7860)
 EOF'
 
 # Step 9: Launch Gradio
