@@ -40,6 +40,15 @@ chmod +x /tmp/dotnet-install.sh
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
 # Step 5: Use existing SwarmUI repo (no git clone or build)
+# Step 5.5: Upgrade SwarmUI to v0.9.6-Beta
+echo "[INFO] Upgrading SwarmUI to latest release..."
+cd /workspace/SwarmUI
+if [ -d .git ]; then
+    git pull
+    echo "[INFO] SwarmUI successfully updated to latest version."
+else
+    echo "[WARNING] SwarmUI directory is missing a Git repo — skipping upgrade."
+fi
 
 # Step 6: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
