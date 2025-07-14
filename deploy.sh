@@ -76,24 +76,42 @@ export ASPNETCORE_URLS=http://0.0.0.0:5000
 # Step 8: Create launch_gradio.py as user
 su - user -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
 import os
+import time
+import json
+import requests
+import gradio as gr
+
+# Gradio + Tunnel Environment Setup
 os.environ["GRADIO_FRPC_BINARY"] = "/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
 os.environ["GRADIO_CACHE_DIR"] = "/workspace/.gradio"
 os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
-import gradio as gr
-import requests
 
-import time
-import json
+# Use timestamp-based session for uniqueness
+session = f"gradio-session-{int(time.time())}"
+workflow_name = "text_to_video_wan.json"  # Can be made dynamic
+
+# Start session with workflow before first API call
+def start_session():
+    url = "http://localhost:5000/api/session/start"
+    payload = {"session": session, "workflow": workflow_name}
+    try:
+        response = requests.post(url, json=payload)
+        print("Session start response:", response.text)
+        return response.status_code == 200
+    except Exception as e:
+        print("[ERROR] Failed to start session:", e)
+        return False
+
+session_started = start_session()
 
 def call_api(endpoint="i2v", prompt="A dog running in the rain"):
-    session = f"gradio-session-{int(time.time())}"
     url = f"http://localhost:5000/api/{endpoint}"
     payload = {
         "session": session,
         "data": [prompt]
     }
 
-    # Log the request locally for tracking
+    # Log request locally
     try:
         with open("/workspace/request_log.json", "a") as log_file:
             log_file.write(json.dumps({
@@ -103,11 +121,12 @@ def call_api(endpoint="i2v", prompt="A dog running in the rain"):
                 "prompt": prompt
             }) + "\n")
     except Exception as log_error:
-        print(f"[LOGGING] Failed to write log: {log_error}")
+        print(f"[LOGGING ERROR] {log_error}")
 
     # Send the request
     try:
         response = requests.post(url, json=payload)
+        print("Raw response:", response.text)
         return response.json()
     except Exception as e:
         return {"error": str(e)}
