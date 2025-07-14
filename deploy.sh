@@ -83,9 +83,12 @@ import gradio as gr
 import requests
 
 def call_api(endpoint="i2v", prompt="A dog running in the rain"):
-    url = f"http://localhost:5000/api/{endpoint}?prompt=" + prompt
+    url = f"http://localhost:5000/api/{endpoint}"
+    payload = {
+        "data": [prompt]  # Payload must be a list
+    }
     try:
-        response = requests.get(url)
+        response = requests.post(url, json=payload)
         return response.json()
     except Exception as e:
         return {"error": str(e)}
