@@ -71,7 +71,7 @@ nohup su - user -c '
 ls -la /workspace/SwarmUI/src/bin
 cd /workspace/SwarmUI/src/bin/live_release
 export ASPNETCORE_URLS=http://0.0.0.0:5000
-dotnet SwarmUI.dll &
+./SwarmUI --launch_mode none --port 5000 &
 ' >> /workspace/server_output.log 2>&1 &
 
 # Step 8: Create launch_gradio.py as user
