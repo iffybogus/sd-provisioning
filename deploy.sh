@@ -62,6 +62,31 @@ echo "[INFO] Rebuilding SwarmUI backend..."
 dotnet add /workspace/SwarmUI/src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 dotnet publish /workspace/SwarmUI/src/SwarmUI.csproj -c Release -o /workspace/SwarmUI/src/bin/live_release/
 
+# Step 6: Verify SwarmUI backend is healthy
+echo "[INFO] Checking SwarmUI backend health..."
+
+attempts=0
+max_attempts=10
+sleep_between=3
+
+while [ $attempts -lt $max_attempts ]; do
+    response=$(curl -s -X POST http://localhost:5000/api/status -H "Content-Type: application/json" -d '{"session":"health-check"}')
+    if echo "$response" | grep -q '"status":'; then
+        echo "[SUCCESS] SwarmUI backend is responsive: $response"
+        break
+    else
+        echo "[WARN] Backend not ready (attempt $((attempts + 1))/$max_attempts)..."
+        sleep $sleep_between
+        attempts=$((attempts + 1))
+    fi
+done
+
+if [ $attempts -eq $max_attempts ]; then
+    echo "[ERROR] SwarmUI backend failed to respond after $max_attempts attempts."
+    exit 1
+fi
+
+
 # Step 6: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
 ls -la /workspace/SwarmUI
