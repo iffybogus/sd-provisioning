@@ -82,12 +82,30 @@ os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
 import gradio as gr
 import requests
 
+import time
+import json
+
 def call_api(endpoint="i2v", prompt="A dog running in the rain"):
+    session = f"gradio-session-{int(time.time())}"
     url = f"http://localhost:5000/api/{endpoint}"
     payload = {
-        "session": "gradio-test-session",
+        "session": session,
         "data": [prompt]
     }
+
+    # Log the request locally for tracking
+    try:
+        with open("/workspace/request_log.json", "a") as log_file:
+            log_file.write(json.dumps({
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "endpoint": endpoint,
+                "session": session,
+                "prompt": prompt
+            }) + "\n")
+    except Exception as log_error:
+        print(f"[LOGGING] Failed to write log: {log_error}")
+
+    # Send the request
     try:
         response = requests.post(url, json=payload)
         return response.json()
