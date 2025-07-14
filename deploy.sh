@@ -50,6 +50,11 @@ else
     echo "[WARNING] SwarmUI directory is missing a Git repo — skipping upgrade."
 fi
 
+# Step 5.6: Rebuild SwarmUI backend with .NET (required for v0.9.6+ changes)
+cd /workspace/SwarmUI
+echo "[INFO] Rebuilding SwarmUI backend..."
+dotnet publish -c Release -o src/bin/live_release/
+
 # Step 6: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
 ls -la /workspace/SwarmUI
