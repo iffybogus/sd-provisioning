@@ -95,12 +95,13 @@ workflow_name = "text_to_video_wan.json"
 def start_session():
     url = "http://localhost:5000/api/session/start"
     payload = {"session": session, "workflow": workflow_name}
+    headers = {"Content-Type": "application/json"}
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, headers=headers)
         print("Session start response:", response.text)
         return response.status_code == 200
     except Exception as e:
-        print("[ERROR] Session boot failed:", e)
+        print("[ERROR] Failed to start session:", e)
         return False
 
 session_started = start_session()
