@@ -72,42 +72,29 @@ nohup ./launch-linux.sh --launch_mode none \
 
 sleep 3  # Allow server time to initialize
 
-# Step 6.0: Get valid session_id for API access
-echo "[INFO] Requesting new session token for health check..."
+# Step 6.0: Get valid session ID
+echo "[INFO] Requesting session token..."
 SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
 
 if [ -z "$SESSION_ID" ]; then
-  echo "[ERROR] Failed to retrieve session ID from SwarmUI."
+  echo "[ERROR] Failed to retrieve session ID."
   exit 1
 fi
 
-# Step 6.1: Discover valid status route dynamically
-echo "[INFO] Discovering SwarmUI status endpoint..."
-STATUS_ROUTE=$(curl -s -X POST http://localhost:7801/API/ListRoutes \
-  -H "Content-Type: application/json" \
-  -d "{\"session_id\":\"$SESSION_ID\"}" | grep -oE '/(API|api)/[Ss]tatus' | head -n 1)
-
-if [ -z "$STATUS_ROUTE" ]; then
-  echo "[ERROR] Could not locate a valid status endpoint."
-  exit 1
-fi
-echo "[INFO] Using health check route: $STATUS_ROUTE"
-
-# Step 6.2: Validate SwarmUI backend health with retry logic
-echo "[INFO] Verifying SwarmUI is responsive..."
+# Step 6.1: Use static route for health check
+echo "[INFO] Checking SwarmUI backend health..."
 attempts=0
 max_attempts=10
 sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
-  response=$(curl -s -X POST http://localhost:7801$STATUS_ROUTE \
+  response=$(curl -s -X POST http://localhost:7801/API/GetServerInfo \
     -H "Content-Type: application/json" \
-    -H "Accept: application/json" \
     -d "{\"session_id\":\"$SESSION_ID\"}")
 
-  if echo "$response" | grep -q '"status":"online"'; then
-    echo "[SUCCESS] SwarmUI backend is healthy: $response"
+  if echo "$response" | grep -q '"version"'; then
+    echo "[SUCCESS] SwarmUI backend is responsive: $response"
     break
   else
     echo "[WARN] Health check failed (attempt $((attempts + 1))/$max_attempts)..."
@@ -117,11 +104,11 @@ while [ $attempts -lt $max_attempts ]; do
 done
 
 if [ $attempts -eq $max_attempts ]; then
-  echo "[ERROR] SwarmUI did not pass health check after $max_attempts attempts."
+  echo "[ERROR] Backend did not pass health check after $max_attempts attempts."
   exit 1
 fi
 
-# Step 6.1: Download WAN2.1 models using environment variable
+# Step 6.2: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
 ls -la /workspace/SwarmUI
 # mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
