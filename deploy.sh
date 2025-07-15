@@ -62,7 +62,11 @@ if [ ! -d /workspace/ComfyUI ]; then
   git clone https://github.com/comfyanonymous/ComfyUI /workspace/ComfyUI
   echo "[INFO] Installing ComfyUI dependencies..."
   pip install -r /workspace/ComfyUI/requirements.txt
+
+  echo "[INFO] Installing additional required modules..."
+  pip install safetensors
 fi
+
 
 # Step 5.7: Clean and rebuild backend
 echo "[INFO] Rebuilding SwarmUI backend..."
@@ -96,6 +100,11 @@ SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
 if [ -z "$SESSION_ID" ]; then
   echo "[ERROR] Session ID retrieval failed."
   exit 1
+fi
+
+if ! python3 -c "import safetensors" &>/dev/null; then
+  echo "[INFO] Installing missing Python module: safetensors"
+  pip install safetensors
 fi
 
 # Step 6.1: Register ComfyUI backend
