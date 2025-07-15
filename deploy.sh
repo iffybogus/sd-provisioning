@@ -79,7 +79,7 @@ sleep 3  # Allow server time to initialize
 
 # Step 6.0: Get valid session ID
 echo "[INFO] Requesting session token..."
-SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
+export SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
 
 if [ -z "$SESSION_ID" ]; then
@@ -94,7 +94,7 @@ max_attempts=10
 sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
-  response=$(curl -s -X POST http://localhost:7801/API/GetServerInfo \
+  response=$(curl -s -X POST http://localhost:7801/API/GenerateText2Image \
     -H "Content-Type: application/json" \
     -d "{\"session_id\":\"$SESSION_ID\"}")
 
