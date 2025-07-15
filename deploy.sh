@@ -56,30 +56,35 @@ echo "[INFO] Installing FreneticUtilities..."
 dotnet add src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 
 # Step 5.7: Clean and rebuild backend
-echo "[INFO] Rebuilding backend..."
+echo "[INFO] Rebuilding SwarmUI backend..."
 rm -rf src/bin/* src/obj/*
 dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# Step 5.8: Launch full SwarmUI interface (not just backend)
-echo "[INFO] Launching full SwarmUI interface..."
+# Step 5.8: Launch full SwarmUI interface with workflow preloaded
+echo "[INFO] Launching full SwarmUI interface on port 7801..."
 cd /workspace/SwarmUI
-nohup ./launch-linux.sh --launch_mode none --port 7801 >> /workspace/server_output.log 2>&1 &
-sleep 3  # Let the interface boot
+nohup ./launch-linux.sh --launch_mode none \
+    --port 7801 \
+    --workflow "text_to_video_wan.json" \
+    --session_id "auto" \
+    >> /workspace/server_output.log 2>&1 &
 
-# Step 6.0: Get valid session_id
-echo "[INFO] Requesting new session token..."
-SESSION_ID=$(curl -s -X POST http://localhost:5000/API/GetNewSession \
+sleep 3  # Allow server time to initialize
+
+# Step 6.0: Get valid session_id for API access
+echo "[INFO] Requesting new session token for health check..."
+SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
 
 if [ -z "$SESSION_ID" ]; then
-  echo "[ERROR] Failed to retrieve session ID."
+  echo "[ERROR] Failed to retrieve session ID from SwarmUI."
   exit 1
 fi
 
-# Step 6.1: Discover status route dynamically
-echo "[INFO] Discovering status endpoint..."
-STATUS_ROUTE=$(curl -s -X POST http://localhost:5000/API/ListRoutes \
+# Step 6.1: Discover valid status route dynamically
+echo "[INFO] Discovering SwarmUI status endpoint..."
+STATUS_ROUTE=$(curl -s -X POST http://localhost:7801/API/ListRoutes \
   -H "Content-Type: application/json" \
   -d "{\"session_id\":\"$SESSION_ID\"}" | grep -oE '/(API|api)/[Ss]tatus' | head -n 1)
 
@@ -89,14 +94,14 @@ if [ -z "$STATUS_ROUTE" ]; then
 fi
 echo "[INFO] Using health check route: $STATUS_ROUTE"
 
-# Step 6.2: Backend health check loop
-echo "[INFO] Verifying backend readiness..."
+# Step 6.2: Validate SwarmUI backend health with retry logic
+echo "[INFO] Verifying SwarmUI is responsive..."
 attempts=0
 max_attempts=10
 sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
-  response=$(curl -s -X POST http://localhost:5000$STATUS_ROUTE \
+  response=$(curl -s -X POST http://localhost:7801$STATUS_ROUTE \
     -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -d "{\"session_id\":\"$SESSION_ID\"}")
@@ -112,7 +117,7 @@ while [ $attempts -lt $max_attempts ]; do
 done
 
 if [ $attempts -eq $max_attempts ]; then
-  echo "[ERROR] Backend did not pass health check after $max_attempts attempts."
+  echo "[ERROR] SwarmUI did not pass health check after $max_attempts attempts."
   exit 1
 fi
 
