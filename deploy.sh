@@ -71,6 +71,7 @@ sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
     response=$(curl -s -X POST http://localhost:5000/api/status -H "Content-Type: application/json" -d '{"session":"health-check"}')
+    echo attempts
     if echo "$response" | grep -q '"status":'; then
         echo "[SUCCESS] SwarmUI backend is responsive: $response"
         break
