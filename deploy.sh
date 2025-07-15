@@ -115,8 +115,7 @@ fi
 
 # Step 6.2: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
-ls -la /workspace/SwarmUI
-# mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
 
 wget -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
