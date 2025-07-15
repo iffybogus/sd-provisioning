@@ -39,8 +39,7 @@ chmod +x /tmp/dotnet-install.sh
 /tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Step 5: Use existing SwarmUI repo (no git clone or build)
-# Step 5.5: Upgrade SwarmUI to v0.9.6-Beta
+# Step 5.5: Upgrade SwarmUI to latest release
 echo "[INFO] Upgrading SwarmUI to latest release..."
 cd /workspace/SwarmUI
 git config --global --add safe.directory /workspace/SwarmUI
@@ -52,49 +51,47 @@ else
     echo "[WARNING] SwarmUI directory is missing a Git repo — skipping upgrade."
 fi
 
+# Step 5.6: Install FreneticUtilities dependency
+echo "[INFO] Installing FreneticUtilities..."
+dotnet add src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 
-# Step 5.6: Rebuild SwarmUI backend with .NET (required for v0.9.6+ changes)
-cd /workspace/SwarmUI
-echo "[INFO] Rebuilding SwarmUI backend..."
-# dotnet publish -c Release -o src/bin/live_release/
+# Step 5.7: Clean and rebuild backend
+echo "[INFO] Rebuilding backend..."
+rm -rf src/bin/* src/obj/*
+dotnet restore src/SwarmUI.csproj
+dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# Step 5.7: Install FreneticUtilities dependency
-dotnet add /workspace/SwarmUI/src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
-dotnet publish /workspace/SwarmUI/src/SwarmUI.csproj -c Release -o /workspace/SwarmUI/src/bin/live_release/
-
-# Step 5.8: Launch SwarmUI backend
+# Step 5.8: Launch backend
 echo "[INFO] Launching SwarmUI backend..."
-cd /workspace/SwarmUI
 nohup ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 >> /workspace/server_output.log 2>&1 &
-sleep 2  # Optional: small buffer before checking health
+sleep 2  # brief delay before checking health
 
-# Step 6: Verify SwarmUI backend is healthy
+# Step 6: Backend health check
 echo "[INFO] Checking SwarmUI backend health..."
-
 attempts=0
 max_attempts=10
 sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
-    response=$(curl -s -X POST http://localhost:5000/api/status -H "Content-Type: application/json" -d '{"session":"health-check"}')
-    echo attempts
+    response=$(curl -s -X POST http://localhost:5000/api/status \
+        -H "Content-Type: application/json" \
+        -d '{"session":"health-check"}')
     if echo "$response" | grep -q '"status":'; then
-        echo "[SUCCESS] SwarmUI backend is responsive: $response"
+        echo "[SUCCESS] Backend is responsive: $response"
         break
     else
-        echo "[WARN] Backend not ready (attempt $((attempts + 1))/$max_attempts)..."
+        echo "[WARN] Backend not ready (attempt $((attempts+1))/$max_attempts)..."
         sleep $sleep_between
-        attempts=$((attempts + 1))
+        attempts=$((attempts+1))
     fi
 done
 
 if [ $attempts -eq $max_attempts ]; then
-    echo "[ERROR] SwarmUI backend failed to respond after $max_attempts attempts."
+    echo "[ERROR] Backend failed to respond after $max_attempts attempts."
     exit 1
 fi
 
-
-# Step 6: Download WAN2.1 models using environment variable
+# Step 6.1: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
 ls -la /workspace/SwarmUI
 # mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
