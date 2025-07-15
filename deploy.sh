@@ -81,7 +81,39 @@ nohup ./launch-linux.sh --launch_mode none \
 
 sleep 3  # Allow server time to initialize
 
+# Step 6.2: Download WAN2.1 models using environment variable
+env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
+mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
+
+wget -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
+wget -O wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
+wget -O wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+wget -O wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
+wget -O wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
+EOF
+
+# Step 7: Download example workflows
+su - user <<'EOF'
+cd /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/ExampleWorkflows/
+wget -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
+wget -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
+wget -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
+
+cp text_to_video_wan.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
+cp image_to_video_wan_720p_example.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
+cp image_to_video_wan_480p_example.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
+EOF
+
+# Step 7.5: Launch backend API on port 5000
+nohup su - user -c '
+cd /workspace/SwarmUI
+export ASPNETCORE_URLS=http://0.0.0.0:5000
+./src/bin/live_release/SwarmUI --launch_mode none --port 5000 &
+' >> /workspace/server_output.log 2>&1 &
+
 # Step 6.0: Retrieve valid session ID
+cd /workspace/SwarmUI
 echo "[INFO] Fetching session ID..."
 SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
@@ -123,37 +155,6 @@ if [ $attempts -eq $max_attempts ]; then
   echo "[ERROR] SwarmUI backend did not respond after $max_attempts attempts."
   exit 1
 fi
-
-# Step 6.2: Download WAN2.1 models using environment variable
-env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
-mkdir -p /workspace/SwarmUI/Models/diffusion_models/WAN2.1
-cd /workspace/SwarmUI/Models/diffusion_models/WAN2.1
-
-wget -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
-wget -O wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-wget -O wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-wget -O wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
-wget -O wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
-EOF
-
-# Step 7: Download example workflows
-su - user <<'EOF'
-cd /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/ExampleWorkflows/
-wget -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
-wget -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
-wget -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
-
-cp text_to_video_wan.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
-cp image_to_video_wan_720p_example.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
-cp image_to_video_wan_480p_example.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
-EOF
-
-# Step 7.5: Launch backend API on port 5000
-nohup su - user -c '
-cd /workspace/SwarmUI
-export ASPNETCORE_URLS=http://0.0.0.0:5000
-./src/bin/live_release/SwarmUI --launch_mode none --port 5000 &
-' >> /workspace/server_output.log 2>&1 &
 
 # Step 8: Create launch_gradio.py as user
 su - user -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
