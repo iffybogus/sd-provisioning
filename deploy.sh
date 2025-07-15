@@ -64,31 +64,55 @@ dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 # Step 5.8: Launch backend
 echo "[INFO] Launching SwarmUI backend..."
 nohup ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 >> /workspace/server_output.log 2>&1 &
-sleep 2  # brief delay before checking health
+sleep 2  # Allow server time to initialize
 
-# Step 6: Backend health check
-echo "[INFO] Checking SwarmUI backend health..."
+# Step 6.0: Get valid session_id
+echo "[INFO] Requesting new session token..."
+SESSION_ID=$(curl -s -X POST http://localhost:5000/API/GetNewSession \
+  -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
+
+if [ -z "$SESSION_ID" ]; then
+  echo "[ERROR] Failed to retrieve session ID."
+  exit 1
+fi
+
+# Step 6.1: Discover status route dynamically
+echo "[INFO] Discovering status endpoint..."
+STATUS_ROUTE=$(curl -s -X POST http://localhost:5000/API/ListRoutes \
+  -H "Content-Type: application/json" \
+  -d "{\"session_id\":\"$SESSION_ID\"}" | grep -oE '/(API|api)/[Ss]tatus' | head -n 1)
+
+if [ -z "$STATUS_ROUTE" ]; then
+  echo "[ERROR] Could not locate a valid status endpoint."
+  exit 1
+fi
+echo "[INFO] Using health check route: $STATUS_ROUTE"
+
+# Step 6.2: Backend health check loop
+echo "[INFO] Verifying backend readiness..."
 attempts=0
 max_attempts=10
 sleep_between=3
 
 while [ $attempts -lt $max_attempts ]; do
-    response=$(curl -s -X POST http://localhost:5000/api/status \
-        -H "Content-Type: application/json" \
-        -d '{"session":"health-check"}')
-    if echo "$response" | grep -q '"status":'; then
-        echo "[SUCCESS] Backend is responsive: $response"
-        break
-    else
-        echo "[WARN] Backend not ready (attempt $((attempts+1))/$max_attempts)..."
-        sleep $sleep_between
-        attempts=$((attempts+1))
-    fi
+  response=$(curl -s -X POST http://localhost:5000$STATUS_ROUTE \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    -d "{\"session_id\":\"$SESSION_ID\"}")
+
+  if echo "$response" | grep -q '"status":"online"'; then
+    echo "[SUCCESS] SwarmUI backend is healthy: $response"
+    break
+  else
+    echo "[WARN] Health check failed (attempt $((attempts + 1))/$max_attempts)..."
+    sleep $sleep_between
+    attempts=$((attempts + 1))
+  fi
 done
 
 if [ $attempts -eq $max_attempts ]; then
-    echo "[ERROR] Backend failed to respond after $max_attempts attempts."
-    exit 1
+  echo "[ERROR] Backend did not pass health check after $max_attempts attempts."
+  exit 1
 fi
 
 # Step 6.1: Download WAN2.1 models using environment variable
