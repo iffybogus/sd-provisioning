@@ -61,10 +61,11 @@ rm -rf src/bin/* src/obj/*
 dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# Step 5.8: Launch backend
-echo "[INFO] Launching SwarmUI backend..."
-nohup ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 >> /workspace/server_output.log 2>&1 &
-sleep 2  # Allow server time to initialize
+# Step 5.8: Launch full SwarmUI interface (not just backend)
+echo "[INFO] Launching full SwarmUI interface..."
+cd /workspace/SwarmUI
+nohup ./launch-linux.sh --launch_mode none --port 7801 >> /workspace/server_output.log 2>&1 &
+sleep 3  # Let the interface boot
 
 # Step 6.0: Get valid session_id
 echo "[INFO] Requesting new session token..."
