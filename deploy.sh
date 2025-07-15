@@ -42,8 +42,6 @@ ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 # Step 5.5: Upgrade SwarmUI to latest release
 echo "[INFO] Upgrading SwarmUI to latest release..."
 cd /workspace/SwarmUI
-chown -R user:user /workspace/SwarmUI/
-chmod -R u+rwX /workspace/SwarmUI/
 git config --global --add safe.directory /workspace/SwarmUI
 if [ -d .git ]; then
     git checkout master
@@ -55,8 +53,6 @@ fi
 
 # Step 5.6: Install FreneticUtilities dependency
 echo "[INFO] Installing FreneticUtilities..."
-chown -R user:user /workspace/SwarmUI/src/
-chmod -R u+rwX /workspace/SwarmUI/src/
 dotnet add src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 
 # Step 5.7: Clean and rebuild backend
@@ -67,8 +63,8 @@ dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
 # Step 5.7.5: Fix ownership and permissions on live_release
 echo "[INFO] Setting ownership and permissions for SwarmUI binaries..."
-chown -R user:user /workspace/SwarmUI/src/bin/live_release/
-chmod -R u+rwX /workspace/SwarmUI/src/bin/live_release/
+chown -R user:user /workspace/SwarmUI/
+chmod -R u+rwX /workspace/SwarmUI/
 
 # Step 5.8: Launch full SwarmUI interface with workflow preloaded
 echo "[INFO] Launching full SwarmUI interface on port 7801..."
