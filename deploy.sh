@@ -55,6 +55,15 @@ fi
 echo "[INFO] Installing FreneticUtilities..."
 dotnet add src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 
+# Step 5.6: Clone and install ComfyUI if missing
+echo "[INFO] Checking for ComfyUI installation..."
+if [ ! -d /workspace/ComfyUI ]; then
+  echo "[INFO] Cloning ComfyUI..."
+  git clone https://github.com/comfyanonymous/ComfyUI /workspace/ComfyUI
+  echo "[INFO] Installing ComfyUI dependencies..."
+  pip install -r /workspace/ComfyUI/requirements.txt
+fi
+
 # Step 5.7: Clean and rebuild backend
 echo "[INFO] Rebuilding SwarmUI backend..."
 rm -rf src/bin/* src/obj/*
@@ -65,8 +74,6 @@ dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 echo "[INFO] Fixing ownership and permissions..."
 chown -R user:user /workspace/SwarmUI/src/bin/live_release/
 chmod -R u+rwX /workspace/SwarmUI/src/bin/live_release/
-
-# Optional global fix
 chown -R user:user /workspace/SwarmUI/
 chmod -R u+rwX /workspace/SwarmUI/
 
@@ -79,7 +86,31 @@ nohup ./launch-linux.sh --launch_mode none \
     --session_id "auto" \
     >> /workspace/server_output.log 2>&1 &
 
-sleep 3  # Allow server time to initialize
+sleep 6  # Increased delay to ensure backend fully initializes
+
+# Step 6.0: Retrieve valid session ID
+echo "[INFO] Fetching session ID..."
+SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
+  -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
+
+if [ -z "$SESSION_ID" ]; then
+  echo "[ERROR] Session ID retrieval failed."
+  exit 1
+fi
+
+# Step 6.1: Register ComfyUI backend
+echo "[INFO] Registering ComfyUI backend..."
+curl -s -X POST http://localhost:7801/API/AddBackend \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "'"$SESSION_ID"'",
+    "backend_type": "comfy_self_start",
+    "backend_id": "comfy1",
+    "enabled": true,
+    "params": {
+      "path": "/workspace/ComfyUI/main.py"
+    }
+  }'
 
 # Step 6.2: Download WAN2.1 models using environment variable
 env HF_TOKEN=$HF_TOKEN su - user <<'EOF'
@@ -93,7 +124,7 @@ wget -O wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.
 wget -O wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
 EOF
 
-# Step 7: Download example workflows
+# Step 6.3: Download example workflows
 su - user <<'EOF'
 cd /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/ExampleWorkflows/
 wget -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
@@ -105,25 +136,14 @@ cp image_to_video_wan_720p_example.json /workspace/SwarmUI/src/BuiltinExtensions
 cp image_to_video_wan_480p_example.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
 EOF
 
-# Step 7.5: Launch backend API on port 5000
+# Step 6.4: Launch backend API on port 5000
 nohup su - user -c '
 cd /workspace/SwarmUI
 export ASPNETCORE_URLS=http://0.0.0.0:5000
 ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 &
 ' >> /workspace/server_output.log 2>&1 &
 
-# Step 6.0: Retrieve valid session ID
-cd /workspace/SwarmUI
-echo "[INFO] Fetching session ID..."
-SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
-  -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
-
-if [ -z "$SESSION_ID" ]; then
-  echo "[ERROR] Session ID retrieval failed."
-  exit 1
-fi
-
-# Step 6.1: Health check via dummy generation
+# Step 6.5: Confirm backend responsiveness with dummy generation
 echo "[INFO] Validating backend health..."
 attempts=0
 max_attempts=5
@@ -134,25 +154,25 @@ while [ $attempts -lt $max_attempts ]; do
     -H "Content-Type: application/json" \
     -d '{
       "session_id": "'"$SESSION_ID"'",
-      "prompt": "test",
+      "prompt": "test image",
       "images": 1,
       "width": 256,
       "height": 256,
       "donotsave": true
     }')
 
-  if echo "$response" | grep -q '"status"\|"output"\|"success"'; then
-    echo "[SUCCESS] SwarmUI is healthy and responding: $response"
+  if echo "$response" | grep -q '"output"\|"image_path"\|"result"'; then
+    echo "[SUCCESS] SwarmUI backend is active and responded: $response"
     break
   else
-    echo "[WARN] Health check attempt $((attempts + 1)) failed. Retrying..."
+    echo "[WARN] Attempt $((attempts + 1)) failed: $response"
     sleep $sleep_between
     attempts=$((attempts + 1))
   fi
 done
 
 if [ $attempts -eq $max_attempts ]; then
-  echo "[ERROR] SwarmUI backend did not respond after $max_attempts attempts."
+  echo "[ERROR] Backend did not respond successfully after $max_attempts attempts."
   exit 1
 fi
 
