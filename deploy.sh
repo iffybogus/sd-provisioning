@@ -61,13 +61,17 @@ rm -rf src/bin/* src/obj/*
 dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# Step 5.7.5: Fix ownership and permissions on live_release
-echo "[INFO] Setting ownership and permissions for SwarmUI binaries..."
+# Step 5.7.5: Fix permissions and ownership
+echo "[INFO] Fixing ownership and permissions..."
+chown -R user:user /workspace/SwarmUI/src/bin/live_release/
+chmod -R u+rwX /workspace/SwarmUI/src/bin/live_release/
+
+# Optional global fix
 chown -R user:user /workspace/SwarmUI/
 chmod -R u+rwX /workspace/SwarmUI/
 
-# Step 5.8: Launch full SwarmUI interface with workflow preloaded
-echo "[INFO] Launching full SwarmUI interface on port 7801..."
+# Step 5.8: Launch SwarmUI interface
+echo "[INFO] Launching SwarmUI on port 7801 with workflow preload..."
 cd /workspace/SwarmUI
 nohup ./launch-linux.sh --launch_mode none \
     --port 7801 \
@@ -77,39 +81,46 @@ nohup ./launch-linux.sh --launch_mode none \
 
 sleep 3  # Allow server time to initialize
 
-# Step 6.0: Get valid session ID
-echo "[INFO] Requesting session token..."
-export SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
+# Step 6.0: Retrieve valid session ID
+echo "[INFO] Fetching session ID..."
+SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
 
 if [ -z "$SESSION_ID" ]; then
-  echo "[ERROR] Failed to retrieve session ID."
+  echo "[ERROR] Session ID retrieval failed."
   exit 1
 fi
 
-# Step 6.1: Use static route for health check
-echo "[INFO] Checking SwarmUI backend health..."
+# Step 6.1: Health check via dummy generation
+echo "[INFO] Validating backend health..."
 attempts=0
-max_attempts=10
-sleep_between=3
+max_attempts=5
+sleep_between=4
 
 while [ $attempts -lt $max_attempts ]; do
   response=$(curl -s -X POST http://localhost:7801/API/GenerateText2Image \
     -H "Content-Type: application/json" \
-    -d "{\"session_id\":\"$SESSION_ID\"}")
+    -d '{
+      "session_id": "'"$SESSION_ID"'",
+      "prompt": "test",
+      "images": 1,
+      "width": 256,
+      "height": 256,
+      "donotsave": true
+    }')
 
-  if echo "$response" | grep -q '"version"'; then
-    echo "[SUCCESS] SwarmUI backend is responsive: $response"
+  if echo "$response" | grep -q '"status"\|"output"\|"success"'; then
+    echo "[SUCCESS] SwarmUI is healthy and responding: $response"
     break
   else
-    echo "[WARN] Health check failed (attempt $((attempts + 1))/$max_attempts)..."
+    echo "[WARN] Health check attempt $((attempts + 1)) failed. Retrying..."
     sleep $sleep_between
     attempts=$((attempts + 1))
   fi
 done
 
 if [ $attempts -eq $max_attempts ]; then
-  echo "[ERROR] Backend did not pass health check after $max_attempts attempts."
+  echo "[ERROR] SwarmUI backend did not respond after $max_attempts attempts."
   exit 1
 fi
 
