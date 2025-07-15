@@ -62,6 +62,12 @@ echo "[INFO] Rebuilding SwarmUI backend..."
 dotnet add /workspace/SwarmUI/src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 dotnet publish /workspace/SwarmUI/src/SwarmUI.csproj -c Release -o /workspace/SwarmUI/src/bin/live_release/
 
+# Step 5.8: Launch SwarmUI backend
+echo "[INFO] Launching SwarmUI backend..."
+cd /workspace/SwarmUI
+nohup ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 >> /workspace/server_output.log 2>&1 &
+sleep 2  # Optional: small buffer before checking health
+
 # Step 6: Verify SwarmUI backend is healthy
 echo "[INFO] Checking SwarmUI backend health..."
 
