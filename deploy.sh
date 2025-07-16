@@ -30,8 +30,10 @@ wget -q --show-progress -O /workspace/.gradio/frpc/frpc_linux_amd64_v0.3 \
   https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64
 chmod +x /workspace/.gradio/frpc/frpc_linux_amd64_v0.3
 
-# Step 3: Install Gradio as user with PATH
-su - user -c "export PATH=\"\$HOME/.local/bin:\$PATH\" && HOME=/home/user pip3 install --user gradio"
+# Step 3.2: Install gradio and safetensors as 'user'
+su - user -c "export PATH=\"\$HOME/.local/bin:\$PATH\" && HOME=/home/user pip3 install --user gradio safetensors"
+
+echo "[INFO] Installed gradio and safetensors for 'user'"
 
 # Step 4: Install .NET SDK
 wget -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
