@@ -160,6 +160,7 @@ import json
 import requests
 import gradio as gr
 from glob import glob
+import subprocess
 
 # Setup environment variables for Gradio + FRPC
 os.environ["GRADIO_FRPC_BINARY"] = "/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
@@ -169,6 +170,15 @@ os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
 # Generate unique session ID
 session = f"gradio-session-{int(time.time())}"
 workflow_name = "text_to_video_wan.json"
+
+# Launch ComfyUI on port 7801
+def launch_comfyui(port=7801):
+    comfy_path = "/workspace/ComfyUI/main.py"
+    print(f"[INFO] Launching ComfyUI at port {port}...")
+    subprocess.Popen(["python3", comfy_path, "--port", str(port)])
+    time.sleep(5)  # optional delay to let ComfyUI initialize
+
+launch_comfyui()
 
 # Attempt to start session on launch
 def start_session():
@@ -212,8 +222,7 @@ def call_api(endpoint="i2v", prompt="A dog running in the rain"):
     try:
         response = requests.post(url, json=payload)
         print("Raw response:", response.text)
-        data = response.json()
-        return data
+        return response.json()
     except Exception as e:
         return {"error": str(e)}
 
