@@ -152,40 +152,6 @@ export ASPNETCORE_URLS=http://0.0.0.0:5000
 ./src/bin/live_release/SwarmUI --launch_mode none --port 5000 &
 ' >> /workspace/server_output.log 2>&1 &
 
-# Step 6.5: Confirm backend responsiveness with dummy generation
-echo "[INFO] Validating backend health..."
-attempts=0
-max_attempts=5
-sleep_between=4
-
-while [ $attempts -lt $max_attempts ]; do
-  response=$(curl -s -X POST http://localhost:7801/API/GenerateText2Image \
-    -H "Content-Type: application/json" \
-    -d '{
-      "session_id": "'"$SESSION_ID"'",
-      "prompt": "test image",
-      "model": "wan2.1_i2v_720p_14B_fp16.safetensors",
-      "images": 1,
-      "width": 512,
-      "height": 512,
-      "donotsave": true
-    }')
-
-  if echo "$response" | grep -q '"output"\|"image_path"\|"result"'; then
-    echo "[SUCCESS] SwarmUI backend is active and responded: $response"
-    break
-  else
-    echo "[WARN] Attempt $((attempts + 1)) failed: $response"
-    sleep $sleep_between
-    attempts=$((attempts + 1))
-  fi
-done
-
-if [ $attempts -eq $max_attempts ]; then
-  echo "[ERROR] Backend did not respond successfully after $max_attempts attempts."
-  exit 1
-fi
-
 # Step 8: Create launch_gradio.py as user
 su - user -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
 import os
