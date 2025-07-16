@@ -164,86 +164,116 @@ su - user -c 'cat <<EOF > /workspace/SwarmUI/launch_gradio.py
 import os
 import time
 import json
+import socket
 import requests
+import subprocess
 import gradio as gr
 from glob import glob
-import subprocess
 
-# Setup environment variables for Gradio + FRPC
-os.environ["GRADIO_FRPC_BINARY"] = "/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
-os.environ["GRADIO_CACHE_DIR"] = "/workspace/.gradio"
-os.environ["GRADIO_TEMP_DIR"] = "/workspace/.gradio"
+# --------- Config ---------
+COMFY_PORT = 7801
+SESSION_FILE = "/workspace/comfy_session.json"
+MODEL_PATH = "Models/diffusion_models/WAN2.1"
+COMFY_MAIN = "/workspace/ComfyUI/main.py"
+# --------------------------
 
-# Generate unique session ID
-session = f"gradio-session-{int(time.time())}"
-workflow_name = "text_to_video_wan.json"
+# ✅ Launch ComfyUI subprocess
+def launch_comfyui():
+    print(f"[INFO] Launching ComfyUI on port {COMFY_PORT}...")
+    subprocess.Popen(["python3", COMFY_MAIN, "--port", str(COMFY_PORT)])
 
-# Launch ComfyUI on port 7801
-def launch_comfyui(port=7801):
-    comfy_path = "/workspace/ComfyUI/main.py"
-    print(f"[INFO] Launching ComfyUI at port {port}...")
-    subprocess.Popen(["python3", comfy_path, "--port", str(port)])
-    time.sleep(5)  # optional delay to let ComfyUI initialize
+# ✅ Wait for ComfyUI to respond
+def wait_for_comfy(timeout=30):
+    for i in range(timeout):
+        try:
+            with socket.create_connection(("localhost", COMFY_PORT), timeout=2):
+                print(f"[READY] ComfyUI is listening on port {COMFY_PORT}")
+                return True
+        except:
+            print(f"[WAIT] ComfyUI not ready ({i+1}/{timeout})...")
+            time.sleep(1)
+    return False
 
-launch_comfyui()
+# ✅ Persist session across reboots
+def load_or_create_session():
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, "r") as f:
+                session = json.load(f).get("session_id")
+                if session:
+                    print(f"[INFO] Reusing existing session ID: {session}")
+                    return session
+        except:
+            print("[WARN] Failed to load session file.")
 
-# Attempt to start session on launch
-def start_session():
-    url = "http://localhost:5000/api/session/start"
-    payload = {"session": session, "workflow": workflow_name}
-    headers = {"Content-Type": "application/json"}
+    # If session not found, create one
+    print("[INFO] Creating new ComfyUI session...")
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        print("Session start response:", response.text)
-        return response.status_code == 200
+        resp = requests.post(f"http://localhost:{COMFY_PORT}/API/GetNewSession", json={}, timeout=10)
+        session = resp.json().get("SESSION_ID")
+        with open(SESSION_FILE, "w") as f:
+            json.dump({"session_id": session}, f)
+        print(f"[INFO] New session ID saved: {session}")
+        return session
     except Exception as e:
-        print("[ERROR] Failed to start session:", e)
-        return False
+        print("[ERROR] Could not create ComfyUI session:", e)
+        return None
 
-session_started = start_session()
-
-# Function to fetch latest video from output folder
-def fetch_latest_video():
-    files = sorted(glob("/workspace/SwarmUI/output/*.mp4"), key=os.path.getmtime, reverse=True)
-    return files[0] if files else None
-
-# Main prompt processing logic
-def call_api(endpoint="i2v", prompt="A dog running in the rain"):
-    if not session_started:
-        return {"error": "Session initialization failed. The backend workflow could not be started."}
-
-    url = f"http://localhost:5000/api/{endpoint}"
-    payload = {"session": session, "data": [prompt]}
-
+# ✅ Query valid model names
+def list_available_models(session_id):
     try:
-        with open("/workspace/request_log.json", "a") as log_file:
-            log_file.write(json.dumps({
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "endpoint": endpoint,
-                "session": session,
-                "prompt": prompt
-            }) + "\n")
-    except Exception as log_error:
-        print(f"[LOGGING ERROR] {log_error}")
+        resp = requests.post(f"http://localhost:{COMFY_PORT}/API/ListModels", json={
+            "session_id": session_id,
+            "path": MODEL_PATH
+        }, timeout=10)
+        return resp.json().get("models", [])
+    except Exception as e:
+        print("[ERROR] Failed to list models:", e)
+        return []
 
+# ✅ Use ComfyUI API to generate image
+def call_comfy_api(prompt, model):
+    payload = {
+        "session_id": session,
+        "prompt": prompt,
+        "images": 1,
+        "model": model,
+        "width": 512,
+        "height": 512,
+        "donotsave": True
+    }
     try:
-        response = requests.post(url, json=payload)
-        print("Raw response:", response.text)
+        response = requests.post(f"http://localhost:{COMFY_PORT}/API/GenerateText2Image",
+                                 json=payload, timeout=20)
+        print("ComfyUI response:", response.text)
         return response.json()
     except Exception as e:
         return {"error": str(e)}
 
-# Wrap Gradio UI with video preview section
+# ✅ Get latest output video
+def fetch_latest_video():
+    files = sorted(glob("/workspace/SwarmUI/output/*.mp4"), key=os.path.getmtime, reverse=True)
+    return files[0] if files else None
+
+# 🎬 Pipeline begins
+launch_comfyui()
+wait_for_comfy()
+session = load_or_create_session()
+session_started = session is not None
+model_list = list_available_models(session) if session_started else []
+
+# 🌿 Gradio UI
 with gr.Blocks() as demo:
     gr.Markdown("## WAN 2.1 API Gateway")
     with gr.Row():
-        model_dropdown = gr.Dropdown(choices=["i2v", "t2v", "vace"], label="Model", value="t2v")
+        model_dropdown = gr.Dropdown(choices=model_list, label="Model", value=model_list[0] if model_list else None)
         prompt_input = gr.Textbox(label="Prompt", value="monkey in a tree")
-    output_display = gr.JSON(label="API Response")
+
+    output_display = gr.JSON(label="ComfyUI API Response")
     video_preview = gr.Video(label="Latest Output", interactive=True)
 
-    def run_all(endpoint, prompt):
-        result = call_api(endpoint, prompt)
+    def run_all(model, prompt):
+        result = call_comfy_api(prompt, model)
         video = fetch_latest_video()
         return result, video
 
