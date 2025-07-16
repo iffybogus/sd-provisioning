@@ -46,17 +46,31 @@ chmod +x /tmp/dotnet-install.sh
 /tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Step 5.5: Upgrade SwarmUI to latest release
-echo "[INFO] Upgrading SwarmUI to latest release..."
+# Step 5.5: Stable upgrade of SwarmUI
+echo "[INFO] Preparing SwarmUI Git repo..."
 cd /workspace/SwarmUI
 git config --global --add safe.directory /workspace/SwarmUI
+
+# Define version control
+STABLE_TAG="0.9.5-Beta"
+STABLE_COMMIT="194b0c0f"  # Commit shown in your session
+ALLOW_MASTER_OVERRIDE=false  # Set to true ONLY when testing latest SwarmUI
+
 if [ -d .git ]; then
-    git checkout master
-    git pull origin master
-    echo "[INFO] SwarmUI successfully updated to latest version."
+    git fetch --all --tags
+    if [ "$ALLOW_MASTER_OVERRIDE" = true ]; then
+        echo "[WARNING] Overriding stability — using master branch!"
+        git checkout master && git pull origin master
+        echo "[INFO] Active SwarmUI commit: $(git rev-parse HEAD)"
+    else
+        echo "[INFO] Locking SwarmUI to tag $STABLE_TAG with commit $STABLE_COMMIT"
+        git checkout $STABLE_COMMIT
+        echo "[INFO] SwarmUI version pinned to commit: $(git rev-parse HEAD)"
+    fi
 else
-    echo "[WARNING] SwarmUI directory is missing a Git repo — skipping upgrade."
+    echo "[WARN] No Git repo found — skipping upgrade."
 fi
+
 
 # Step 5.6: Install FreneticUtilities dependency
 echo "[INFO] Installing FreneticUtilities..."
