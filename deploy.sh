@@ -94,7 +94,7 @@ sleep 6  # Increased delay to ensure backend fully initializes
 
 # Step 6.0: Retrieve valid session ID
 echo "[INFO] Fetching session ID..."
-SESSION_ID=$(curl -s -X POST http://localhost:7801/API/GetNewSession \
+SESSION_ID=$(curl -v -s -X POST http://localhost:7801/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}' | grep -oP '"session_id":"\K[^"]+')
 
 if [ -z "$SESSION_ID" ]; then
@@ -109,7 +109,7 @@ fi
 
 # Step 6.1: Register ComfyUI backend
 echo "[INFO] Registering ComfyUI backend..."
-curl -s -X POST http://localhost:7801/API/AddBackend \
+curl -v -s -X POST http://localhost:7801/API/AddBackend \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "'"$SESSION_ID"'",
@@ -164,9 +164,10 @@ while [ $attempts -lt $max_attempts ]; do
     -d '{
       "session_id": "'"$SESSION_ID"'",
       "prompt": "test image",
+      "model": "wan2.1_i2v_720p_14B_fp16.safetensors",
       "images": 1,
-      "width": 256,
-      "height": 256,
+      "width": 512,
+      "height": 512,
       "donotsave": true
     }')
 
