@@ -192,7 +192,7 @@ import gradio as gr
 from glob import glob
 
 # --------- Config ---------
-COMFY_PORT = 7801
+COMFY_PORT = 7802
 SESSION_FILE = "/workspace/comfy_session.json"
 MODEL_PATH = "Models/diffusion_models/WAN2.1"
 COMFY_MAIN = "/workspace/ComfyUI/main.py"
