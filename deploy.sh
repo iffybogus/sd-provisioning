@@ -71,12 +71,20 @@ else
     echo "[WARN] No Git repo found — skipping upgrade."
 fi
 
+# Step 5.6: Install Python modules for 'user'
+echo "[INFO] Installing Python dependencies for 'user'..."
 
-# Step 5.6: Install FreneticUtilities dependency
+su - user -c "export PATH=\"\$HOME/.local/bin:\$PATH\" && HOME=/home/user pip3 install --user gradio safetensors"
+
+# Ensure environment variables are persistent
+su - user -c "echo 'export PYTHONPATH=\$HOME/.local/lib/python3.*/site-packages:\$PYTHONPATH' >> ~/.bashrc"
+su - user -c "echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc"
+
+# Step 5.7: Install FreneticUtilities dependency
 echo "[INFO] Installing FreneticUtilities..."
 dotnet add src/SwarmUI.csproj package FreneticLLC.FreneticUtilities --version 1.1.1
 
-# Step 5.6: Clone and install ComfyUI if missing
+# Step 5.8: Clone and install ComfyUI if missing
 echo "[INFO] Checking for ComfyUI installation..."
 if [ ! -d /workspace/ComfyUI ]; then
   echo "[INFO] Cloning ComfyUI..."
@@ -88,21 +96,20 @@ if [ ! -d /workspace/ComfyUI ]; then
   pip install safetensors
 fi
 
-
-# Step 5.7: Clean and rebuild backend
+# Step 5.9: Clean and rebuild backend
 echo "[INFO] Rebuilding SwarmUI backend..."
 rm -rf src/bin/* src/obj/*
 dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# Step 5.7.5: Fix permissions and ownership
+# Step 5.9.5: Fix permissions and ownership
 echo "[INFO] Fixing ownership and permissions..."
 chown -R user:user /workspace/SwarmUI/src/bin/live_release/
 chmod -R u+rwX /workspace/SwarmUI/src/bin/live_release/
 chown -R user:user /workspace/SwarmUI/
 chmod -R u+rwX /workspace/SwarmUI/
 
-# Step 5.8: Launch SwarmUI interface
+# Step 5.9.6: Launch SwarmUI interface
 echo "[INFO] Launching SwarmUI on port 7801 with workflow preload..."
 cd /workspace/SwarmUI
 nohup ./launch-linux.sh --launch_mode none \
@@ -357,3 +364,5 @@ EORC
 chmod +x /etc/rc.local
 
 echo "[INFO] Provisioning complete."
+echo "[INFO] Final active SwarmUI commit: $(cd /workspace/SwarmUI && git rev-parse HEAD)"
+python3 -c "import gradio; print('[INFO] Gradio version:', gradio.__version__)"
