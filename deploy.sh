@@ -15,6 +15,11 @@ chown -R user:user /workspace
 # Add .local/bin to PATH for user
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/user/.bashrc
 
+# Step 3.3: Set environment variables for Python module discovery
+su - user -c "echo 'export PYTHONPATH=\$HOME/.local/lib/python3.*/site-packages:\$PYTHONPATH' >> ~/.bashrc"
+su - user -c "echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc"
+
+
 # Step 1: Install dependencies
 apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq
 
