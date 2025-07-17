@@ -70,11 +70,11 @@ WAN_PATH="/workspace/SwarmUI/Models/diffusion_models/WAN2.1"
 env HF_TOKEN=$HF_TOKEN su - "$MODEL_USER" <<EOF
 mkdir -p "$WAN_PATH"
 cd "$WAN_PATH"
-wget -nv -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/.../clip_vision_h.safetensors"
-wget -nv -O wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/.../wan_2.1_vae.safetensors"
-wget -nv -O wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/.../wan2.1_i2v_720p_14B_fp16.safetensors"
-wget -nv -O wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/.../wan2.1_t2v_14B_fp16.safetensors"
-wget -nv -O wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/.../wan2.1_vace_14B_fp16.safetensors"
+wget -nv -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
+wget -nv -O wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
+wget -nv -O wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+wget -nv -O wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
+wget -nv -O wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
 EOF
 
 # ────── Step 7: Generate .swarm.json metadata ──────
