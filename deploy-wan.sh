@@ -136,8 +136,28 @@ local_port = $COMFYUI_PORT
 subdomain = comfyui-$(hostname | tr -dc 'a-zA-Z0-9')
 EOF
 
-nohup "$FRPC_BIN" -c /workspace/.gradio/frpc/frpc_comfy.ini >> /workspace/frpc_comfy.log 2>&1 &
-sleep 6
-export SHARE_URL=$(grep -o 'https://[^ ]*\.gradio\.live' /workspace/frpc_comfy.log | head -n 1)
-echo "$SHARE_URL" > /workspace/share_url.txt
-echo "[INFO] ComfyUI share link: $SHARE_URL"
+# ────── Step 13: Launch Ngrok tunnel to expose ComfyUI ──────
+# === CONFIG ===
+AUTH_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
+PORT = $COMFYUI_PORT
+LOG_FILE="/workspace/session_response.log"
+
+# === INSTALL NGROK v3 ===
+wget -qO ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+tar -xzf ngrok.tgz
+mv ngrok /usr/local/bin/ngrok
+
+# === AUTHENTICATE ===
+ngrok authtoken "$AUTH_TOKEN"
+
+# === LAUNCH TUNNEL ===
+(ngrok http $PORT > "$LOG_FILE" 2>&1) &
+
+# Wait a moment for tunnel to establish
+sleep 3
+
+# === EXTRACT PUBLIC LINK ===
+PUBLIC_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$LOG_FILE" | head -n 1)
+
+echo "🌐 Public Link: $PUBLIC_URL"
+
