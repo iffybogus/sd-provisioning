@@ -127,7 +127,9 @@ sleep 6
 nc -z localhost 7802 && echo "[READY] ComfyUI is running"
 
 # ────── Step 12: Launch FRPC tunnel to expose ComfyUI ──────
-cat <<EOF > /workspace/.gradio/frpc/frpc_comfy.ini
+cat << 'EOF' > /workspace/.gradio/frpc/frpc_comfy.ini
+[common]
+
 [comfyui]
 type = http
 local_port = 7802
