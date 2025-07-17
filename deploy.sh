@@ -103,6 +103,10 @@ pip3 install --user gradio safetensors
 pip3 install --user torch --extra-index-url https://download.pytorch.org/whl/cu118
 EOF
 
+su - "$MODEL_USER" <<'EOF'
+pip3 install --user torch tqdm safetensors gradio
+EOF
+
 # ────── Step 7: Launch ComfyUI ──────
 echo "[INFO] Launching ComfyUI on port $COMFYUI_PORT..." | tee -a /workspace/provision.log
 if ! lsof -i :"$COMFYUI_PORT" >/dev/null; then
