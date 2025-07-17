@@ -96,9 +96,9 @@ chown -R "$MODEL_USER:$MODEL_USER" "$WAN_PATH"
 # ────── Step 8: Download WAN2.1 workflows ──────
 su - "$MODEL_USER" <<'EOF'
 cd /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/ExampleWorkflows/
-wget -nv -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/.../text_to_video_wan.json"
-wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/.../image_to_video_wan_720p_example.json"
-wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/.../image_to_video_wan_480p_example.json"
+wget -nv -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
+wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
+wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
 cp *.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
 EOF
 
