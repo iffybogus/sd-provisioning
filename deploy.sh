@@ -262,12 +262,7 @@ PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | h
 echo "[INFO] Gradio URL: $PUBLIC_URL" | tee -a /workspace/provision.log
 echo "$PUBLIC_URL" > /workspace/share_url.txt
 
-if [[ -n "$PUBLIC_URL" ]]; then
-  echo "[INFO] Sending webhook notification..." | tee -a /workspace/provision.log
-  curl -G https://n8n.ifeatuo.com/videohooks \
-       -H "Content-Type: application/json" \
-       --data-urlencode "share_url=$PUBLIC_URL"
-fi
+# REMOVED WEBHOOK 
 
 # ─── Step 11: Watchdog for Outbid Detection ───────────
 echo "[INFO] Installing watchdog script..." | tee -a /workspace/provision.log
@@ -285,4 +280,67 @@ EOF
 
 chmod +x /workspace/watch_bid.sh
 nohup bash /workspace/watch_bid.sh >> /workspace/watchdog.log 2>&1 &
+
+#  Step 12: Launch FRPC Tunnel for ComfyUI
+echo "[INFO] Launching FRPC tunnel for ComfyUI..." | tee -a /workspace/provision.log
+
+# Ensure FRPC config exists
+cat <<EOF > /workspace/.gradio/frpc/frpc_comfy.ini
+[comfyui]
+type = http
+local_port = $COMFYUI_PORT
+use_encryption = true
+use_compression = true
+EOF
+
+# Launch FRPC
+nohup $FRPC_PATH -c /workspace/.gradio/frpc/frpc_comfy.ini >> /workspace/frpc_comfy.log 2>&1 &
+
+# Wait and extract public link
+sleep 10
+export COMFY_URL=$(grep -o 'https://[^ ]*\.gradio\.live' /workspace/frpc_comfy.log | head -n 1)
+echo "[INFO] Public ComfyUI URL: $COMFY_URL" | tee -a /workspace/provision.log
+echo "$COMFY_URL" > /workspace/comfyui_public_url.txt
+
+if [[ -n "$PUBLIC_URL" ]]; then
+  echo "[INFO] Sending webhook notification..." | tee -a /workspace/provision.log
+  curl -G https://n8n.ifeatuo.com/videohooks \
+       -H "Content-Type: application/json" \
+       --data-urlencode "share_url=$COMFY_URL"
+fi
+
+# Step 13: expose_comfyui_via_frpc() block
+expose_comfyui_via_frpc() {
+  echo "[INFO] Deprecating Gradio Blocks UI — exposing native ComfyUI instead." | tee -a /workspace/provision.log
+
+  CONFIG_PATH="/workspace/.gradio/frpc/frpc_comfy.ini"
+  LOG_PATH="/workspace/frpc_comfy.log"
+  mkdir -p /workspace/.gradio/frpc
+
+  # Write FRPC config
+  cat <<EOF > "$CONFIG_PATH"
+[comfyui]
+type = http
+local_port = $COMFYUI_PORT
+use_encryption = true
+use_compression = true
+EOF
+
+  # Launch FRPC tunnel
+  nohup "$FRPC_PATH" -c "$CONFIG_PATH" >> "$LOG_PATH" 2>&1 &
+  sleep 10
+
+  # Extract public URL
+  export SHARE_URL=$(grep -o 'https://[^ ]*\.gradio\.live' "$LOG_PATH" | head -n 1)
+  echo "$SHARE_URL" > /workspace/comfy_url.txt
+
+  # Log result
+  if [[ -n "$SHARE_URL" ]]; then
+    echo "[INFO] ComfyUI exposed at: $SHARE_URL" | tee -a /workspace/provision.log
+  else
+    echo "[ERROR] Failed to extract ComfyUI tunnel URL from FRPC log." | tee -a /workspace/provision.log
+  fi
+}
+
+expose_comfyui_via_frpc
 
