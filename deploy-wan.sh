@@ -157,7 +157,13 @@ ngrok authtoken "$AUTH_TOKEN"
 sleep 3
 
 # === EXTRACT PUBLIC LINK ===
-PUBLIC_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$LOG_FILE" | head -n 1)
+export PUBLIC_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$LOG_FILE" | head -n 1)
 
 echo "🌐 Public Link: $PUBLIC_URL"
 
+if [[ -n "$PUBLIC_URL" ]]; then
+  echo "[INFO] Sending webhook notification..." | tee -a /workspace/provision.log
+  curl -G https://n8n.ifeatuo.com/videohooks \
+       -H "Content-Type: application/json" \
+       --data-urlencode "share_url=$PUBLIC_URL"
+fi
