@@ -46,6 +46,11 @@ else
   echo "[INFO] Retrieved session ID: $SESSION_ID" | tee -a /workspace/provision.log
 fi
 
+if [ ! -f /workspace/ComfyUI/main.py ]; then
+  echo "[INFO] Cloning ComfyUI as user..." | tee -a /workspace/provision.log
+  su - user -c 'git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI'
+fi
+
 # ────── Step 3: Download WAN2.1 Models ──────
 echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provision.log
 env HF_TOKEN=$HF_TOKEN su - "$MODEL_USER" <<'EOF'
