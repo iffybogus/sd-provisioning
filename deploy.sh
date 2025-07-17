@@ -95,32 +95,36 @@ EOF
 echo "[INFO] Installing Python dependencies..." | tee -a /workspace/provision.log
 su - "$MODEL_USER" -c "pip3 install --user gradio safetensors"
 
-# ────── Step 7: Register ComfyUI Backend ──────
-echo "[INFO] Registering ComfyUI backend..." | tee -a /workspace/provision.log
-CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-  -X POST http://localhost:$SWARMUI_PORT/API/AddBackend \
-  -H "Content-Type: application/json" -d '{}')
-if [ "$CODE" == "200" ]; then
-  curl -s -X POST http://localhost:$SWARMUI_PORT/API/AddBackend \
-    -H "Content-Type: application/json" \
-    -d '{
-      "session_id": "'"$SESSION_ID"'",
-      "backend_type": "comfy_self_start",
-      "backend_id": "comfy1",
-      "enabled": true,
-      "params": { "path": "/workspace/ComfyUI/main.py" }
-    }'
-else
-  echo "[WARN] Endpoint unavailable — backend not registered." | tee -a /workspace/provision.log
-fi
-
-# ────── Step 8: Launch ComfyUI ──────
-echo "[INFO] Launching ComfyUI..." | tee -a /workspace/provision.log
+# ────── Step 7: Launch ComfyUI ──────
+echo "[INFO] Launching ComfyUI on port $COMFYUI_PORT..." | tee -a /workspace/provision.log
 if ! lsof -i :"$COMFYUI_PORT" >/dev/null; then
   nohup python3 /workspace/ComfyUI/main.py --port "$COMFYUI_PORT" >> /workspace/comfy_output.log 2>&1 &
+  sleep 6
+  for i in {1..30}; do
+    if nc -z localhost "$COMFYUI_PORT"; then
+      echo "[READY] ComfyUI is listening on port $COMFYUI_PORT" | tee -a /workspace/provision.log
+      break
+    fi
+    echo "[WAIT] ComfyUI not ready ($i/30)..." | tee -a /workspace/provision.log
+    sleep 1
+  done
 else
   echo "[WARN] ComfyUI port $COMFYUI_PORT already in use." | tee -a /workspace/provision.log
 fi
+
+# ────── Step 8: Register ComfyUI Backend ──────
+echo "[INFO] Registering ComfyUI backend in SwarmUI..." | tee -a /workspace/provision.log
+ADD_BACKEND_RESPONSE=$(curl -s -X POST http://localhost:$SWARMUI_PORT/API/AddBackend \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "'"$SESSION_ID"'",
+    "backend_type": "comfy_self_start",
+    "backend_id": "comfy1",
+    "enabled": true,
+    "params": { "path": "/workspace/ComfyUI/main.py" }
+  }')
+
+echo "[DEBUG] AddBackend response: $ADD_BACKEND_RESPONSE" | tee -a /workspace/provision.log
 
 # ────── Step 9: Write Gradio UI Script ──────
 echo "[INFO] Generating Gradio UI script..." | tee -a /workspace/provision.log
@@ -238,7 +242,7 @@ with gr.Blocks() as demo:
     run_button.click(fn=run_all, inputs=[model_dropdown, prompt_input],
                      outputs=[output_display, video_preview])
 
-demo.queue().launch(share=True, server_name="0.0.0.0", server_port=7860)
+demo.queue().launch(share=True, server_name="0.0.0.0", server_port=7802)
 PYCODE
 EOF
 
