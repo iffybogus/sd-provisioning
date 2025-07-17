@@ -22,7 +22,7 @@ export SESSION_LOG="/workspace/logs/session_response.log"
 export GRADIO_ENV="/workspace/.gradio"
 export GRADIO_SCRIPT="/workspace/SwarmUI/launch_gradio.py"
 export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
-export MODEL_USER=${MODEL_USER:-user}
+export MODEL_USER="user"
 
 mkdir -p "$WAN_PATH" /workspace/logs "$GRADIO_ENV/frpc"
 
@@ -66,8 +66,8 @@ dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
 # ────── Step 6: Download WAN2.1 models ──────
-WAN_PATH="/workspace/SwarmUI/Models/diffusion_models/WAN2.1"
-env HF_TOKEN=$HF_TOKEN su - "$MODEL_USER" <<EOF
+export WAN_PATH="/workspace/SwarmUI/Models/diffusion_models/WAN2.1"
+su - "$MODEL_USER" <<EOF
 mkdir -p "$WAN_PATH"
 cd "$WAN_PATH"
 wget -nv -O clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
