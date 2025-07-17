@@ -32,10 +32,10 @@ sleep 6
 
 # ────── Step 2: Get SwarmUI Session ID ──────
 echo "[INFO] Retrieving SwarmUI session ID..." | tee -a /workspace/provision.log
-RESPONSE=$(curl -s -X POST http://localhost:$SWARMUI_PORT/API/GetNewSession \
+export RESPONSE=$(curl -s -X POST http://localhost:$SWARMUI_PORT/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}')
 echo "$RESPONSE" | tee -a "$SESSION_LOG"
-SESSION_ID=$(echo "$RESPONSE" | grep -oP '"session_id":"\K[^"]+')
+export SESSION_ID=$(echo "$RESPONSE" | grep -oP '"session_id":"\K[^"]+')
 if [ -z "$SESSION_ID" ]; then
   echo "[ERROR] Failed to get session ID!" | tee -a /workspace/provision.log
   exit 1
