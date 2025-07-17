@@ -13,6 +13,10 @@ export GRADIO_SCRIPT="/workspace/SwarmUI/launch_gradio.py"
 
 mkdir -p "$WAN_PATH" /workspace/logs
 
+# -----
+
+
+
 # ────── Step 0: DNS Resolver Check ──────
 echo "[INFO] Checking /etc/resolv.conf..." | tee -a /workspace/provision.log
 if ! grep -q "nameserver" /etc/resolv.conf; then
@@ -46,11 +50,15 @@ else
   echo "[INFO] Retrieved session ID: $SESSION_ID" | tee -a /workspace/provision.log
 fi
 
+# ────── Step 2.1: Git ComfyUI ──────
 if [ ! -f /workspace/ComfyUI/main.py ]; then
   echo "[INFO] Cloning ComfyUI as user..." | tee -a /workspace/provision.log
   su - user -c 'git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI'
+  echo "[INFO] Installing ComfyUI dependencies...new add"
+  pip install -r /workspace/ComfyUI/requirements.txt
+  echo "[INFO] Installing additional required modules...new add"
+  pip install safetensors
 fi
-
 
 # ────── Step 3: Download WAN2.1 Models ──────
 echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provision.log
@@ -93,19 +101,27 @@ cp *.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflow
 EOF
 
 # ────── Step 6: Install Python Modules ──────
-echo "[INFO] Installing Python dependencies..." | tee -a /workspace/provision.log
-echo "[INFO] Installing required Python modules..." | tee -a /workspace/provision.log
+echo "[INFO] Installing required Python modules for '$MODEL_USER'..." | tee -a /workspace/provision.log
 su - "$MODEL_USER" <<'EOF'
-# Install core modules
-pip3 install --user gradio safetensors
-
-# Install PyTorch (adjust CUDA version if needed — this assumes cu118)
-pip3 install --user torch --extra-index-url https://download.pytorch.org/whl/cu118
+export PATH="$HOME/.local/bin:$PATH"
+pip3 install --user torch einops tqdm gradio safetensors --extra-index-url https://download.pytorch.org/whl/cu118
 EOF
 
-su - "$MODEL_USER" <<'EOF'
-pip3 install --user torch tqdm safetensors gradio
-EOF
+# ────── Step 7: Download and Verify FRPC Binary ──────
+echo "[INFO] Downloading FRPC binary..." | tee -a /workspace/provision.log
+FRPC_BIN="/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
+mkdir -p "$(dirname "$FRPC_BIN")"
+
+wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 || {
+  echo "[WARN] wget failed — retrying..." | tee -a /workspace/provision.log
+  sleep 2
+  wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 || {
+    echo "[ERROR] Failed to download FRPC binary after retry." | tee -a /workspace/provision.log
+    exit 1
+  }
+}
+chmod +x "$FRPC_BIN"
+ls -lh "$FRPC_BIN"
 
 # ────── Step 7: Launch ComfyUI ──────
 echo "[INFO] Launching ComfyUI on port $COMFYUI_PORT..." | tee -a /workspace/provision.log
