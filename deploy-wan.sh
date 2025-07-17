@@ -4,16 +4,7 @@ set -e
 set -x
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
-# ────── Step 0: System & user setup ──────
-MODEL_USER="user"
-if ! id "$MODEL_USER" &>/dev/null; then
-  useradd -m "$MODEL_USER"
-fi
-chown -R "$MODEL_USER:$MODEL_USER" /workspace
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> "/home/$MODEL_USER/.bashrc"
-echo 'export PYTHONPATH=$HOME/.local/lib/python3.*/site-packages:$PYTHONPATH' >> "/home/$MODEL_USER/.bashrc"
-
-# ────── Step 0.5: Environment Variables ──────
+# ────── Step 0: Environment Variables ──────
 export SWARMUI_PORT=7801
 export COMFYUI_PORT=7802
 export GRADIO_PORT=7860
@@ -25,6 +16,15 @@ export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
 export MODEL_USER="user"
 
 mkdir -p "$WAN_PATH" /workspace/logs "$GRADIO_ENV/frpc"
+
+# ────── Step 0.5: System & user setup ──────
+
+if ! id "$MODEL_USER" &>/dev/null; then
+  useradd -m "$MODEL_USER"
+fi
+chown -R "$MODEL_USER:$MODEL_USER" /workspace
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> "/home/$MODEL_USER/.bashrc"
+echo 'export PYTHONPATH=$HOME/.local/lib/python3.*/site-packages:$PYTHONPATH' >> "/home/$MODEL_USER/.bashrc"
 
 # ────── Step 1: Install system packages ──────
 apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq netcat
