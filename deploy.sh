@@ -51,6 +51,7 @@ if [ ! -f /workspace/ComfyUI/main.py ]; then
   su - user -c 'git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI'
 fi
 
+
 # ────── Step 3: Download WAN2.1 Models ──────
 echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provision.log
 env HF_TOKEN=$HF_TOKEN su - "$MODEL_USER" <<'EOF'
@@ -93,7 +94,14 @@ EOF
 
 # ────── Step 6: Install Python Modules ──────
 echo "[INFO] Installing Python dependencies..." | tee -a /workspace/provision.log
-su - "$MODEL_USER" -c "pip3 install --user gradio safetensors"
+echo "[INFO] Installing required Python modules..." | tee -a /workspace/provision.log
+su - "$MODEL_USER" <<'EOF'
+# Install core modules
+pip3 install --user gradio safetensors
+
+# Install PyTorch (adjust CUDA version if needed — this assumes cu118)
+pip3 install --user torch --extra-index-url https://download.pytorch.org/whl/cu118
+EOF
 
 # ────── Step 7: Launch ComfyUI ──────
 echo "[INFO] Launching ComfyUI on port $COMFYUI_PORT..." | tee -a /workspace/provision.log
