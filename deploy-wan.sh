@@ -134,8 +134,6 @@ cat <<EOF > "$GRADIO_ENV/frpc/frpc_comfy.ini"
 type = http
 local_port = $COMFYUI_PORT
 subdomain = comfyui-$(hostname | tr -dc 'a-zA-Z0-9')
-use_encryption = true
-use_compression = true
 EOF
 
 nohup "$FRPC_BIN" -c /workspace/.gradio/frpc/frpc_comfy.ini >> /workspace/frpc_comfy.log 2>&1 &
