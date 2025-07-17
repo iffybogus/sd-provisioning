@@ -28,17 +28,22 @@ nohup ./launch-linux.sh --launch_mode none \
   --port "$SWARMUI_PORT" \
   --workflow "text_to_video_wan.json" \
   --session_id "auto" >> /workspace/server_output.log 2>&1 &
-sleep 6
+sleep 10
 
 # ────── Step 2: Get SwarmUI Session ID ──────
 echo "[INFO] Retrieving SwarmUI session ID..." | tee -a /workspace/provision.log
-export RESPONSE=$(curl -s -X POST http://localhost:$SWARMUI_PORT/API/GetNewSession \
+RESPONSE=$(curl -s -X POST http://localhost:$SWARMUI_PORT/API/GetNewSession \
   -H "Content-Type: application/json" -d '{}')
 echo "$RESPONSE" | tee -a "$SESSION_LOG"
-export SESSION_ID=$(echo "$RESPONSE" | grep -oP '"session_id":"\K[^"]+')
+
+SESSION_ID=$(echo "$RESPONSE" | grep -oP '"session_id":"\K[^"]+')
+
 if [ -z "$SESSION_ID" ]; then
-  echo "[ERROR] Failed to get session ID!" | tee -a /workspace/provision.log
-  exit 1
+  TEMP_ID="fallback-session-$(date +%s)"
+  echo "[WARN] /API/GetNewSession failed — using temporary session ID: $TEMP_ID" | tee -a /workspace/provision.log
+  SESSION_ID="$TEMP_ID"
+else
+  echo "[INFO] Retrieved session ID: $SESSION_ID" | tee -a /workspace/provision.log
 fi
 
 # ────── Step 3: Download WAN2.1 Models ──────
