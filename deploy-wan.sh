@@ -75,32 +75,80 @@ pip3 install safetensors einops tqdm
 chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
 chmod -R u+rwX "$COMFYUI_DIR"
 
-# ────── Step 7: Download WAN2.1 models ──────
-COMFYUI_DIR2="/workspace/ComfyUI/models"
-if [ ! -d "$COMFYUI_DIR2" ]; then
-   mkdir -p /workspace/ComfyUI/models/  
-fi
+# ────── Step 7: Shell Function: Resilient Downloader with Retry ──────
+download_with_retry() {
+  local url="$1"
+  local output="$2"
+  local max_retries=5
+  local wait_seconds=30
+  local attempt=1
 
+  while [ "$attempt" -le "$max_retries" ]; do
+    echo "[INFO] Attempt $attempt: Downloading $output" | tee -a /workspace/provision.log
+    wget -nv -O "$output" "$url"
+    if [ $? -eq 0 ]; then
+      echo "[SUCCESS] Downloaded $output" | tee -a /workspace/provision.log
+      return 0
+    else
+      echo "[WARN] Failed to download $output — retrying in $wait_seconds seconds..." | tee -a /workspace/provision.log
+      sleep "$wait_seconds"
+      attempt=$((attempt+1))
+    fi
+  done
+
+  echo "[ERROR] Giving up on $output after $max_retries attempts." | tee -a /workspace/provision.log
+  return 1
+}
+
+
+# ────── Step 7: Download WAN2.1 models ──────
+echo "[INFO] Step 7: Downloading WAN2.1 models..." | tee -a /workspace/provision.log
+
+mkdir -p /workspace/ComfyUI/models/{clip_vision,vae,diffusion_models,unet,clip}
 cd /workspace/ComfyUI/models/
-wget -nv -O clip_vision/clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
-wget -nv -O vae/wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
-wget -nv -O diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-wget -nv -O unet/wan2.1_t2v_1.3B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
-wget -nv -O unet/wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
-wget -nv -O vae/wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
-wget -nv -O clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors" "clip_vision/clip_vision_h.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" "vae/wan_2.1_vae.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors" "diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors" "unet/wan2.1_t2v_1.3B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors" "unet/wan2.1_t2v_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 # ────── Step 8: Download WAN2.1 workflows ──────
-COMFYUI_DIR2="/workspace/ComfyUI/input"
-if [ ! -d "$COMFYUI_DIR2" ]; then
-   mkdir -p /workspace/ComfyUI/input/  
-fi
+echo "[INFO] Step 8: Downloading WAN2.1 workflows..." | tee -a /workspace/provision.log
+mkdir -p /workspace/ComfyUI/input/
 
 su - "$MODEL_USER" <<'EOF'
+download_with_retry() {
+  local url="$1"
+  local output="$2"
+  local max_retries=5
+  local wait_seconds=30
+  local attempt=1
+
+  while [ "$attempt" -le "$max_retries" ]; do
+    echo "[INFO] Attempt $attempt: Downloading $output"
+    wget -nv -O "$output" "$url"
+    if [ $? -eq 0 ]; then
+      echo "[SUCCESS] Downloaded $output"
+      return 0
+    else
+      echo "[WARN] Failed — retrying in $wait_seconds seconds..."
+      sleep "$wait_seconds"
+      attempt=$((attempt+1))
+    fi
+  done
+
+  echo "[ERROR] Giving up on $output after $max_retries attempts."
+  return 1
+}
+
 cd /workspace/ComfyUI/input/
-wget -nv -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
-wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
-wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
+
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json" "text_to_video_wan.json"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
 EOF
 
 # ────── Step 9: Launch SwarmUI backend (port 5000) ──────
