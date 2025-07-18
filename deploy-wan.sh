@@ -140,24 +140,26 @@ SERVER_NAME = "0.0.0.0"
 SERVER_PORT = 7802 
 SHARE_PUBLICLY = True 
 
-# ────── Define Gradio Interface ────── 
-def inference_fn(input_text): 
-return f"Received: {input_text}" 
+# ────── Define Inference Function ──────
+def inference_fn(input_text):
+    return f"Received: {input_text}"
 
-demo = gr.Interface( 
-fn=inference_fn, 
-inputs=gr.Textbox(label="Input"), 
-outputs=gr.Textbox(label="Output"), 
-title="ComfyUI Gradio API", 
-description="Exposes local ComfyUI API via Gradio tunnel" 
-) 
+# ────── Configure Interface ──────
+demo = gr.Interface(
+    fn=inference_fn,
+    inputs=gr.Textbox(label="Input"),
+    outputs=gr.Textbox(label="Output"),
+    title="ComfyUI Gradio API",
+    description="Exposes local ComfyUI API via Gradio tunnel"
+)
 
-# ────── Launch Gradio ────── 
-demo.queue().launch( 
-  server_name=SERVER_NAME, 
-  server_port=SERVER_PORT, 
-  share=SHARE_PUBLICLY 
-) 
+# ────── Launch Gradio App ──────
+demo.queue().launch(
+    server_name="0.0.0.0",
+    server_port=7802,
+    share=True
+)
+
 
 PYCODE 
 EOF
