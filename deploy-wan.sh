@@ -3,8 +3,24 @@
 set -e
 set -x
 exec > >(tee -a /workspace/provisioning.log) 2>&1
+# ────── Step 0: Redirect /workspace to host-mounted storage ──────
+echo "[INFO] Redirecting /workspace to /etc/hosts/workspace" | tee -a /etc/hosts/provision.log
 
-# ────── Step 0: Environment Variables ──────
+# Create destination if it doesn't exist
+mkdir -p /etc/hosts/workspace
+
+# Preserve contents of original /workspace (if any)
+if [ -d /workspace ] && [ ! -L /workspace ]; then
+  rsync -a /workspace/ /etc/hosts/workspace/
+  mv /workspace /workspace_backup
+fi
+
+# Create symlink to host-mounted volume
+ln -sfn /etc/hosts/workspace /workspace
+
+echo "[INFO] /workspace now points to /etc/hosts/workspace" | tee -a /etc/hosts/provision.log
+
+# ────── Step 0.1: Environment Variables ──────
 export SWARMUI_PORT=7801
 export COMFYUI_PORT=7802
 export GRADIO_PORT=7860
