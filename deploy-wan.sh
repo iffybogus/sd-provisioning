@@ -103,7 +103,7 @@ wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-O
 wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
 EOF
 
-# ────── Step 10: Launch SwarmUI backend (port 5000) ──────
+# ────── Step 9: Launch SwarmUI backend (port 5000) ──────
 nohup su - "$MODEL_USER" -c '
 cd /workspace/SwarmUI
 export ASPNETCORE_URLS=http://0.0.0.0:5000
@@ -112,12 +112,12 @@ export ASPNETCORE_URLS=http://0.0.0.0:5000
 sleep 5
 nc -z localhost 5000 && echo "[READY] SwarmUI API on port 5000"
 
-# ────── Step 11: Launch ComfyUI on port 7802 ──────
+# ────── Step 10: Launch ComfyUI on port 7802 ──────
 nohup python3 /workspace/ComfyUI/main.py --port 7802 >> /workspace/comfy_output.log 2>&1 &
 sleep 6
 nc -z localhost 7802 && echo "[READY] ComfyUI is running"
 
-# ────── Step 12: Launch FRPC tunnel to expose ComfyUI ──────
+# ────── Step 11: Launch FRPC tunnel to expose ComfyUI ──────
 cat << 'EOF' > "$GRADIO_ENV/frpc/frpc_comfy.ini"
 [common]
 
@@ -126,6 +126,57 @@ type = http
 local_port = $COMFYUI_PORT
 subdomain = comfyui-$(hostname | tr -dc 'a-zA-Z0-9')
 EOF
+
+# ────── Step 12: Write Gradio UI Script ────── 
+
+echo "[INFO] Generating Gradio UI script..." | tee -a /workspace/provision.log 
+su - "$MODEL_USER" <<'EOF' 
+cat <<'PYCODE' > /workspace/SwarmUI/launch_gradio.py 
+import gradio as gr 
+import os 
+
+# ────── Configuration ────── 
+SERVER_NAME = "0.0.0.0" 
+SERVER_PORT = 7802 
+SHARE_PUBLICLY = True 
+
+# ────── Define Gradio Interface ────── 
+def inference_fn(input_text): 
+return f"Received: {input_text}" 
+
+demo = gr.Interface( 
+fn=inference_fn, 
+inputs=gr.Textbox(label="Input"), 
+outputs=gr.Textbox(label="Output"), 
+title="ComfyUI Gradio API", 
+description="Exposes local ComfyUI API via Gradio tunnel" 
+) 
+
+# ────── Launch Gradio ────── 
+demo.queue().launch( 
+  server_name=SERVER_NAME, 
+  server_port=SERVER_PORT, 
+  share=SHARE_PUBLICLY 
+) 
+
+PYCODE 
+EOF
+
+# ─── Step 12.1: Launch Gradio Interface ─────────────────── 
+echo "[INFO] Starting Gradio UI..." | tee -a /workspace/provision.log 
+nohup su - "$MODEL_USER" -c " 
+export PATH=\"\$HOME/.local/bin:\$PATH\" 
+export GRADIO_FRPC_BINARY=$FRPC_PATH 
+export GRADIO_CACHE_DIR=$GRADIO_ENV 
+export GRADIO_TEMP_DIR=$GRADIO_ENV 
+cd /workspace/SwarmUI 
+HOME=/home/$MODEL_USER 
+python3 launch_gradio.py " >> /workspace/gradio_output.log 2>&1 &
+
+sleep 20
+PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
+echo "[INFO] Gradio URL: $PUBLIC_URL" | tee -a /workspace/provision.log
+echo "$PUBLIC_URL" > /workspace/share_url.txt
 
 # ────── Step 13: Launch Ngrok tunnel to expose ComfyUI ──────
 # === CONFIG ===
