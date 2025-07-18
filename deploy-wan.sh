@@ -65,7 +65,22 @@ rm -rf src/bin/* src/obj/*
 dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
-# ────── Step 6: Download WAN2.1 models ──────
+# ────── Step 6: Install ComfyUI ──────
+COMFYUI_DIR="/workspace/ComfyUI"
+if [ ! -d "$COMFYUI_DIR" ]; then
+  git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
+fi
+pip3 install -r "$COMFYUI_DIR/requirements.txt"
+pip3 install safetensors einops tqdm
+chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
+chmod -R u+rwX "$COMFYUI_DIR"
+
+# ────── Step 7: Download WAN2.1 models ──────
+COMFYUI_DIR2="/workspace/ComfyUI/models"
+if [ ! -d "$COMFYUI_DIR2" ]; then
+   mkdir -p /workspace/ComfyUI/models/  
+fi
+
 cd /workspace/ComfyUI/models/
 wget -nv -O clip_vision/clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
 wget -nv -O vae/wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
@@ -76,22 +91,17 @@ wget -nv -O vae/wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-O
 wget -nv -O clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 # ────── Step 8: Download WAN2.1 workflows ──────
+COMFYUI_DIR2="/workspace/ComfyUI/input"
+if [ ! -d "$COMFYUI_DIR2" ]; then
+   mkdir -p /workspace/ComfyUI/input/  
+fi
+
 su - "$MODEL_USER" <<'EOF'
 cd /workspace/ComfyUI/input/
 wget -nv -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
 wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
 wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
 EOF
-
-# ────── Step 9: Install ComfyUI ──────
-COMFYUI_DIR="/workspace/ComfyUI"
-if [ ! -d "$COMFYUI_DIR" ]; then
-  git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
-fi
-pip3 install -r "$COMFYUI_DIR/requirements.txt"
-pip3 install safetensors einops tqdm
-chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
-chmod -R u+rwX "$COMFYUI_DIR"
 
 # ────── Step 10: Launch SwarmUI backend (port 5000) ──────
 nohup su - "$MODEL_USER" -c '
