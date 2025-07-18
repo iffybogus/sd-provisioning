@@ -66,47 +66,21 @@ dotnet restore src/SwarmUI.csproj
 dotnet publish src/SwarmUI.csproj -c Release -o src/bin/live_release/
 
 # ────── Step 6: Download WAN2.1 models ──────
-echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provision.log
-su - "$MODEL_USER" <<'EOF'
-mkdir -p /workspace/SwarmUI/Models
-mkdir -p /workspace/SwarmUI/Models/text_encoders
-chown user:user /workspace/SwarmUI/Models
-chown user:user /workspace/SwarmUI/Models/text_encoders
-
-cd /workspace/SwarmUI/Models
-
+cd /workspace/ComfyUI/models/
 wget -nv -O clip_vision/clip_vision_h.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
-wget -nv -O VAE/wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
+wget -nv -O vae/wan_2.1_vae.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 wget -nv -O diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-wget -nv -O diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
-wget -nv -O diffusion_models/wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
-wget -nv -O diffusion_models/wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
-wget -nv -O text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-EOF
-
-# ────── Step 7: Generate .swarm.json metadata ──────
-for f in "$WAN_PATH"/*.safetensors; do
-  base=$(basename "$f" .safetensors)
-  meta="$WAN_PATH/$base.swarm.json"
-  [ -f "$meta" ] || cat <<EOF > "$meta"
-{
-  "title": "$base",
-  "description": "WAN2.1 cinematic model",
-  "tags": ["wan", "diffusion", "video"],
-  "standard_width": 512,
-  "standard_height": 512
-}
-EOF
-done
-chown -R "$MODEL_USER:$MODEL_USER" "$WAN_PATH"
+wget -nv -O unet/wan2.1_t2v_1.3B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
+wget -nv -O unet/wan2.1_t2v_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors"
+wget -nv -O vae/wan2.1_vace_14B_fp16.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors"
+wget -nv -O clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 # ────── Step 8: Download WAN2.1 workflows ──────
 su - "$MODEL_USER" <<'EOF'
-cd /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/ExampleWorkflows/
+cd /workspace/ComfyUI/input/
 wget -nv -O text_to_video_wan.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json"
 wget -nv -O image_to_video_wan_720p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json"
 wget -nv -O image_to_video_wan_480p_example.json "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json"
-cp *.json /workspace/SwarmUI/src/BuiltinExtensions/ComfyUIBackend/CustomWorkflows/Examples/
 EOF
 
 # ────── Step 9: Install ComfyUI ──────
