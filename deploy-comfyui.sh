@@ -1,218 +1,95 @@
 #!/bin/bash
 
 set -e
-set -x
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
-# ────── Step 0: Redirect /workspace to mounted disk ──────
-echo "[INFO] Redirecting /workspace to /mnt/workspace"
-mkdir -p /mnt/workspace
-
-if [ -d /workspace ] && [ ! -L /workspace ]; then
-  rsync -a /workspace/ /mnt/workspace/
-  mv /workspace /workspace_backup
+# ────── Step 0: Ensure we're running as user ──────
+if [ "$(whoami)" != "user" ]; then
+  echo "[ERROR] Must be run as 'user'" >&2
+  exit 1
 fi
 
-ln -sfn /mnt/workspace /workspace
-chown user:user /workspace
-
-# ────── Step 1: Setup Logging ──────
-mkdir -p /workspace/logs
-touch /workspace/provisioning.log
-
-# ────── Step 0.1: Environment Variables ──────
+# ────── Step 1: Environment Setup ──────
 export COMFYUI_PORT=7801
-export GRADIO_PORT=7860
-export WAN_PATH="/workspace/ComfyUI/models/diffusion_models/"
-export SESSION_LOG="/workspace/logs/session_response.log"
-export GRADIO_ENV="/workspace/.gradio"
-export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
-export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
-export MODEL_USER="user"
-
-mkdir -p /workspace/logs "$GRADIO_ENV/frpc"
-
-# ────── Step 2: Define Retry Download Function ──────
-download_with_retry() {
-  local url="$1"
-  local output="$2"
-  local max_retries=5
-  local wait_seconds=30
-  local attempt=1
-
-  while [ "$attempt" -le "$max_retries" ]; do
-    echo "[INFO] Attempt $attempt: Downloading $output" | tee -a /workspace/provisioning.log
-    wget -nv -O "$output" "$url"
-    if [ $? -eq 0 ]; then
-      echo "[SUCCESS] Downloaded $output" | tee -a /workspace/provisioning.log
-      return 0
-    else
-      echo "[WARN] Failed to download $output — retrying in $wait_seconds seconds..." | tee -a /workspace/provisioning.log
-      sleep "$wait_seconds"
-      attempt=$((attempt+1))
-    fi
-  done
-
-  echo "[ERROR] Giving up on $output after $max_retries attempts." | tee -a /workspace/provisioning.log
-  return 1
-}
-
-# ────── Step 3: System & user setup ──────
-
-if ! id "$MODEL_USER" &>/dev/null; then
-  useradd -m "$MODEL_USER"
-fi
-chown -R "$MODEL_USER:$MODEL_USER" /workspace
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> "/home/$MODEL_USER/.bashrc"
-echo 'export PYTHONPATH=$HOME/.local/lib/python3.*/site-packages:$PYTHONPATH' >> "/home/$MODEL_USER/.bashrc"
-
-# ────── Step 4: Install system packages ──────
-apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq netcat
-
-if ! command -v python &>/dev/null; then ln -s /usr/bin/python3 /usr/bin/python; fi
-
-# ────── Step 5: Install .NET SDK ──────
-wget -nv -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
-chmod +x /tmp/dotnet-install.sh
-/tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
-ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
-
-# ────── Step 6: Install Python modules ──────
-su - "$MODEL_USER" <<'EOF'
-export PATH="$HOME/.local/bin:$PATH"
-pip3 install --user torch einops tqdm gradio safetensors --extra-index-url https://download.pytorch.org/whl/cu118
-EOF
-
-# ────── Step 7: Download FRPC binary ──────
-FRPC_BIN="/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
-mkdir -p "$(dirname "$FRPC_BIN")"
-wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 || {
-  sleep 2
-  wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 || {
-    echo "[ERROR] FRPC download failed"; exit 1;
-  }
-}
-chmod +x "$FRPC_BIN"
-
-# ────── Step 8: Install ComfyUI ──────
+export NGROK_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
+export WAN_DIR="/workspace/ComfyUI/models"
+export WORKFLOW_DIR="/workspace/ComfyUI/input"
 export COMFYUI_DIR="/workspace/ComfyUI"
-mv -f "$COMFYUI_DIR" ComfyUI2
+export GRADIO_LOG="/workspace/logs/gradio_output.log"
+export NGROK_LOG="/workspace/logs/ngrok_output.log"
+
+mkdir -p /workspace/{logs,.local/bin}
+
+# ────── Step 2: Git & Python Setup ──────
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
 fi
-pip3 install -r "$COMFYUI_DIR/requirements.txt"
-pip3 install safetensors einops tqdm
-chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
-chmod -R u+rwX "$COMFYUI_DIR"
-cp -r ComfyUI2 ComfyUI
-mv -f ComfyUI2
-# ────── Step 9: Launch ComfyUI on port 7802 ──────
-nohup python3 /workspace/ComfyUI/main.py --port 7801 >> /workspace/comfy_output.log 2>&1 &
+
+pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
+pip3 install --user safetensors einops tqdm gradio
+
+chown -R user:user "$COMFYUI_DIR"
+
+# ────── Step 3: Launch ComfyUI ──────
+nohup python3 "$COMFYUI_DIR/main.py" --port "$COMFYUI_PORT" > /workspace/logs/comfyui.log 2>&1 &
 sleep 6
-nc -z localhost 7801 && echo "[READY] ComfyUI is running"
 
-# ────── Step 10: Download WAN2.1 Models ──────
-echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provisioning.log
-mkdir -p /workspace/ComfyUI/models/{clip_vision,vae,diffusion_models,unet,clip}
-cd /workspace/ComfyUI/models/
+# ────── Step 4: Download WAN2.1 Models ──────
+mkdir -p "$WAN_DIR"/{clip_vision,vae,diffusion_models,unet,clip}
+cd "$WAN_DIR"
 
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors" "clip_vision/clip_vision_h.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" "vae/wan_2.1_vae.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors" "diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors" "unet/wan2.1_t2v_1.3B_fp16.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors" "unet/wan2.1_t2v_14B_fp16.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+download() { wget -nv -O "$2" "$1"; }
 
-# ────── Step 11: Download WAN2.1 Workflows ──────
-echo "[INFO] Downloading WAN2.1 workflows..." | tee -a /workspace/provisioning.log
-mkdir -p /workspace/ComfyUI/input/
-cd /workspace/ComfyUI/input/
+download "https://huggingface.co/Comfy-Org/...clip_vision_h.safetensors" "clip_vision/clip_vision_h.safetensors"
+download "https://huggingface.co/Comfy-Org/...wan_2.1_vae.safetensors" "vae/wan_2.1_vae.safetensors"
+download "https://huggingface.co/Comfy-Org/...wan2.1_i2v_720p_14B_fp16.safetensors" "diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+download "https://huggingface.co/Comfy-Org/...wan2.1_t2v_1.3B_fp16.safetensors" "unet/wan2.1_t2v_1.3B_fp16.safetensors"
+download "https://huggingface.co/Comfy-Org/...wan2.1_t2v_14B_fp16.safetensors" "unet/wan2.1_t2v_14B_fp16.safetensors"
+download "https://huggingface.co/Comfy-Org/...wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
+download "https://huggingface.co/Comfy-Org/...umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json" "text_to_video_wan.json"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
-download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
+# ────── Step 5: Download Workflows ──────
+mkdir -p "$WORKFLOW_DIR"
+cd "$WORKFLOW_DIR"
 
-# ────── Step 12: Write Gradio UI Script ────── 
+download "https://huggingface.co/Comfy-Org/...text_to_video_wan.json" "text_to_video_wan.json"
+download "https://huggingface.co/Comfy-Org/...image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
+download "https://huggingface.co/Comfy-Org/...image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
 
-echo "[INFO] Generating Gradio UI script..." | tee -a /workspace/provision.log 
-su - "$MODEL_USER" <<'EOF' 
-cat <<'PYCODE' > /workspace/ComfyUI/launch_gradio.py 
-import gradio as gr 
-import os 
+# ────── Step 6: Gradio Tunnel ──────
+cat << 'EOF' > "$COMFYUI_DIR/launch_gradio.py"
+import gradio as gr
 
-# ────── Configuration ────── 
-SERVER_NAME = "0.0.0.0" 
-SERVER_PORT = 7801
-SHARE_PUBLICLY = True 
-
-# ────── Define Inference Function ──────
-def inference_fn(input_text):
-    return f"Received: {input_text}"
-
-# ────── Configure Interface ──────
-demo = gr.Interface(
-    fn=inference_fn,
-    inputs=gr.Textbox(label="Input"),
-    outputs=gr.Textbox(label="Output"),
-    title="ComfyUI Gradio API",
-    description="Exposes local ComfyUI API via Gradio tunnel"
+def inference_fn(x): return f"Echo: {x}"
+gr.Interface(fn=inference_fn, inputs="text", outputs="text").launch(
+    server_name="0.0.0.0", server_port=$COMFYUI_PORT, share=True
 )
-
-# ────── Launch Gradio App ──────
-demo.queue().launch(
-    server_name="0.0.0.0",
-    server_port=7801,
-    share=True
-)
-
-PYCODE 
 EOF
 
-# ─── Step 13: Launch Gradio Interface ─────────────────── 
-echo "[INFO] Starting Gradio UI..." | tee -a /workspace/provision.log 
-nohup su - "$MODEL_USER" -c " 
-export PATH=\"\$HOME/.local/bin:\$PATH\" 
-export GRADIO_FRPC_BINARY=$FRPC_PATH 
-export GRADIO_CACHE_DIR=$GRADIO_ENV 
-export GRADIO_TEMP_DIR=$GRADIO_ENV 
-cd /workspace/ComfyUI 
-HOME=/home/$MODEL_USER 
-python3 launch_gradio.py " >> /workspace/gradio_output.log 2>&1 &
+nohup python3 "$COMFYUI_DIR/launch_gradio.py" > "$GRADIO_LOG" 2>&1 &
+sleep 10
+GRADIO_URL=$(grep -o 'https://.*\.gradio\.live' "$GRADIO_LOG" | head -n 1)
 
-sleep 20
-PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | head -n 1)
-echo "[INFO] Gradio URL: $PUBLIC_URL" | tee -a /workspace/provision.log
-echo "$PUBLIC_URL" > /workspace/share_url.txt
+# ────── Step 7: Ngrok Tunnel ──────
+wget -qO /tmp/ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+tar -xzf /tmp/ngrok.tgz -C /workspace/.local/bin/
+chmod +x /workspace/.local/bin/ngrok
+export PATH="/workspace/.local/bin:$PATH"
 
-# ────── Step 14: Launch Ngrok tunnel to expose ComfyUI ──────
-# === CONFIG ===
-AUTH_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
-PORT = $COMFYUI_PORT
-LOG_FILE="/workspace/session_response.log"
+ngrok authtoken "$NGROK_TOKEN"
+nohup ngrok http "$COMFYUI_PORT" > "$NGROK_LOG" 2>&1 &
+sleep 6
+NGROK_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$NGROK_LOG" | head -n 1)
 
-# === INSTALL NGROK v3 ===
-wget -qO ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-tar -xzf ngrok.tgz
-mv ngrok /usr/local/bin/ngrok
+# ────── Step 8: Webhook Notification ──────
+TUNNEL_URL="${GRADIO_URL:-$NGROK_URL}"
+echo "[INFO] Tunnel URL: $TUNNEL_URL" | tee -a /workspace/provisioning.log
 
-# === AUTHENTICATE ===
-ngrok authtoken "$AUTH_TOKEN"
-
-# === LAUNCH TUNNEL ===
-(ngrok http $PORT > "$LOG_FILE" 2>&1) &
-
-# Wait a moment for tunnel to establish
-sleep 3
-
-# === EXTRACT PUBLIC LINK ===
-export PUBLIC_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$LOG_FILE" | head -n 1)
-
-echo "🌐 Public Link: $PUBLIC_URL"
-
-if [[ -n "$PUBLIC_URL" ]]; then
-  echo "[INFO] Sending webhook notification..." | tee -a /workspace/provision.log
-  curl -G https://n8n.ifeatuo.com/videohooks \
-       -H "Content-Type: application/json" \
-       --data-urlencode "share_url=$PUBLIC_URL"
+if [[ -n "$TUNNEL_URL" ]]; then
+  curl -X POST -H "Content-Type: application/json" \
+       -d "{\"url\": \"$TUNNEL_URL\"}" https://n8n.ifeatuo.com/videohooks \
+       >> /workspace/provisioning.log 2>&1
 fi
+
+# ────── Step 9: Final Ownership ──────
+chown -R user:user /workspace
