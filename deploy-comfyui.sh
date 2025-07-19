@@ -21,6 +21,8 @@ export NGROK_LOG="/workspace/logs/ngrok_output.log"
 mkdir -p /workspace/{logs,.local/bin}
 
 # ────── Step 2: Git & Python Setup ──────
+cd /workspace
+mv -f ComfyUI ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
 fi
@@ -29,6 +31,8 @@ pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
 pip3 install --user safetensors einops tqdm gradio
 
 chown -R user:user "$COMFYUI_DIR"
+cp -R ComfyUI2 ComfyUI
+rm -f ComfyUI2
 
 # ────── Step 3: Launch ComfyUI ──────
 nohup python3 "$COMFYUI_DIR/main.py" --port "$COMFYUI_PORT" > /workspace/logs/comfyui.log 2>&1 &
