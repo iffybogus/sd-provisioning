@@ -8,7 +8,10 @@ if [ "$(whoami)" != "user" ]; then
   echo "[ERROR] Must be run as 'user'" >&2
   exit 1
 fi
-
+if [ "$(whoami)" = "root" ]; then
+  echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
+  exit 1
+fi
 # ────── Step 1: Environment Setup ──────
 export COMFYUI_PORT=7801
 export NGROK_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
@@ -18,6 +21,12 @@ export COMFYUI_DIR="/workspace/ComfyUI"
 export GRADIO_LOG="/workspace/logs/gradio_output.log"
 export NGROK_LOG="/workspace/logs/ngrok_output.log"
 
+su - user << 'EOF'
+export PATH="\$HOME/.local/bin:\$PATH"
+pip3 install --user torch torchvision torchaudio
+EOF
+
+su - user << 'EOF'
 mkdir -p /workspace/{logs,.local/bin}
 
 # ────── Step 2: Git & Python Setup ──────
@@ -60,7 +69,7 @@ cd "$WORKFLOW_DIR"
 download "https://huggingface.co/Comfy-Org/...text_to_video_wan.json" "text_to_video_wan.json"
 download "https://huggingface.co/Comfy-Org/...image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
 download "https://huggingface.co/Comfy-Org/...image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
-
+EOF
 # ────── Step 6: Gradio Tunnel ──────
 cat << 'EOF' > "$COMFYUI_DIR/launch_gradio.py"
 import gradio as gr
@@ -70,7 +79,7 @@ gr.Interface(fn=inference_fn, inputs="text", outputs="text").launch(
     server_name="0.0.0.0", server_port=$COMFYUI_PORT, share=True
 )
 EOF
-
+=====
 nohup python3 "$COMFYUI_DIR/launch_gradio.py" > "$GRADIO_LOG" 2>&1 &
 sleep 10
 GRADIO_URL=$(grep -o 'https://.*\.gradio\.live' "$GRADIO_LOG" | head -n 1)
