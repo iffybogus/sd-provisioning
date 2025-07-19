@@ -20,8 +20,7 @@ export WORKFLOW_DIR="/workspace/ComfyUI/input"
 export COMFYUI_DIR="/workspace/ComfyUI"
 export GRADIO_LOG="/workspace/logs/gradio_output.log"
 export NGROK_LOG="/workspace/logs/ngrok_output.log"
-export PATH="\$HOME/.local/bin:\$PATH"
-export PATH="/usr/bin:$PATH"
+export PATH="$HOME/.local/bin:/usr/bin:$PATH"
 
 pip3 install --user torch torchvision torchaudio
 
