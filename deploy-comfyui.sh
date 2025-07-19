@@ -135,7 +135,7 @@ import os
 
 # ────── Configuration ────── 
 SERVER_NAME = "0.0.0.0" 
-SERVER_PORT = 7802 
+SERVER_PORT = 7801
 SHARE_PUBLICLY = True 
 
 # ────── Define Inference Function ──────
@@ -154,7 +154,7 @@ demo = gr.Interface(
 # ────── Launch Gradio App ──────
 demo.queue().launch(
     server_name="0.0.0.0",
-    server_port=7802,
+    server_port=7801,
     share=True
 )
 
