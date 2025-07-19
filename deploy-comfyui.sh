@@ -57,7 +57,7 @@ download_with_retry() {
   return 1
 }
 
-# ────── Step 0.5: System & user setup ──────
+# ────── Step 3: System & user setup ──────
 
 if ! id "$MODEL_USER" &>/dev/null; then
   useradd -m "$MODEL_USER"
@@ -66,24 +66,24 @@ chown -R "$MODEL_USER:$MODEL_USER" /workspace
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> "/home/$MODEL_USER/.bashrc"
 echo 'export PYTHONPATH=$HOME/.local/lib/python3.*/site-packages:$PYTHONPATH' >> "/home/$MODEL_USER/.bashrc"
 
-# ────── Step 1: Install system packages ──────
+# ────── Step 4: Install system packages ──────
 apt update && apt install -y python3 python3-pip git-lfs wget curl git unzip sudo software-properties-common openssh-client nodejs npm jq netcat
 
 if ! command -v python &>/dev/null; then ln -s /usr/bin/python3 /usr/bin/python; fi
 
-# ────── Step 2: Install .NET SDK ──────
+# ────── Step 5: Install .NET SDK ──────
 wget -nv -O /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
 chmod +x /tmp/dotnet-install.sh
 /tmp/dotnet-install.sh --version 8.0.100 --install-dir /usr/share/dotnet
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# ────── Step 3: Install Python modules ──────
+# ────── Step 6: Install Python modules ──────
 su - "$MODEL_USER" <<'EOF'
 export PATH="$HOME/.local/bin:$PATH"
 pip3 install --user torch einops tqdm gradio safetensors --extra-index-url https://download.pytorch.org/whl/cu118
 EOF
 
-# ────── Step 4: Download FRPC binary ──────
+# ────── Step 7: Download FRPC binary ──────
 FRPC_BIN="/workspace/.gradio/frpc/frpc_linux_amd64_v0.3"
 mkdir -p "$(dirname "$FRPC_BIN")"
 wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64 || {
@@ -94,7 +94,7 @@ wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_li
 }
 chmod +x "$FRPC_BIN"
 
-# ────── Step 6: Install ComfyUI ──────
+# ────── Step 8: Install ComfyUI ──────
 export COMFYUI_DIR="/workspace/ComfyUI"
 mv -f "$COMFYUI_DIR" ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
@@ -106,12 +106,12 @@ chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
 chmod -R u+rwX "$COMFYUI_DIR"
 cp -r ComfyUI2 ComfyUI
 mv -f ComfyUI2
-# ────── Step 10: Launch ComfyUI on port 7802 ──────
+# ────── Step 9: Launch ComfyUI on port 7802 ──────
 nohup python3 /workspace/ComfyUI/main.py --port 7801 >> /workspace/comfy_output.log 2>&1 &
 sleep 6
 nc -z localhost 7801 && echo "[READY] ComfyUI is running"
 
-# ────── Step 3: Download WAN2.1 Models ──────
+# ────── Step 10: Download WAN2.1 Models ──────
 echo "[INFO] Downloading WAN2.1 models..." | tee -a /workspace/provisioning.log
 mkdir -p /workspace/ComfyUI/models/{clip_vision,vae,diffusion_models,unet,clip}
 cd /workspace/ComfyUI/models/
@@ -124,7 +124,7 @@ download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
 download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
 download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
-# ────── Step 4: Download WAN2.1 Workflows ──────
+# ────── Step 11: Download WAN2.1 Workflows ──────
 echo "[INFO] Downloading WAN2.1 workflows..." | tee -a /workspace/provisioning.log
 mkdir -p /workspace/ComfyUI/input/
 cd /workspace/ComfyUI/input/
@@ -169,7 +169,7 @@ demo.queue().launch(
 PYCODE 
 EOF
 
-# ─── Step 12.1: Launch Gradio Interface ─────────────────── 
+# ─── Step 13: Launch Gradio Interface ─────────────────── 
 echo "[INFO] Starting Gradio UI..." | tee -a /workspace/provision.log 
 nohup su - "$MODEL_USER" -c " 
 export PATH=\"\$HOME/.local/bin:\$PATH\" 
@@ -185,7 +185,7 @@ PUBLIC_URL=$(grep -o 'https://.*\.gradio\.live' /workspace/gradio_output.log | h
 echo "[INFO] Gradio URL: $PUBLIC_URL" | tee -a /workspace/provision.log
 echo "$PUBLIC_URL" > /workspace/share_url.txt
 
-# ────── Step 13: Launch Ngrok tunnel to expose ComfyUI ──────
+# ────── Step 14: Launch Ngrok tunnel to expose ComfyUI ──────
 # === CONFIG ===
 AUTH_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
 PORT = $COMFYUI_PORT
