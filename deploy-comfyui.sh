@@ -1,13 +1,15 @@
 #!/bin/bash
 
 # ────── Step 0: Redirect /workspace to mounted disk ──────
-echo "[INFO] Redirecting /workspace to /etc/hosts/workspace"
-mkdir -p /etc/hosts/workspace
+echo "[INFO] Redirecting /workspace to /mnt/workspace"
+mkdir -p /mnt/workspace
+
 if [ -d /workspace ] && [ ! -L /workspace ]; then
-  rsync -a /workspace/ /etc/hosts/workspace/
+  rsync -a /workspace/ /mnt/workspace/
   mv /workspace /workspace_backup
 fi
-ln -sfn /etc/hosts/workspace /workspace
+
+ln -sfn /mnt/workspace /workspace
 
 # ────── Step 1: Setup Logging ──────
 mkdir -p /workspace/logs
