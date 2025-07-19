@@ -168,7 +168,7 @@ export PATH=\"\$HOME/.local/bin:\$PATH\"
 export GRADIO_FRPC_BINARY=$FRPC_PATH 
 export GRADIO_CACHE_DIR=$GRADIO_ENV 
 export GRADIO_TEMP_DIR=$GRADIO_ENV 
-cd /workspace/SwarmUI 
+cd /workspace/ComfyUI 
 HOME=/home/$MODEL_USER 
 python3 launch_gradio.py " >> /workspace/gradio_output.log 2>&1 &
 
