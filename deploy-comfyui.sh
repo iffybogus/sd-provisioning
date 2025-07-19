@@ -65,6 +65,7 @@ download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
 # ────── Step 5: Launch Tunnels and Export Public URL ──────
 TUNNEL_PORT="${TUNNEL_PORT:-18188}"
 TUNNEL_DEST="/workspace/logs/PUBLIC_URL.txt"
+TUNNEL_MODE="ngrok"
 
 launch_gradio_tunnel() {
   echo "[INFO] Launching Gradio with share=True" | tee -a /workspace/provisioning.log
