@@ -20,9 +20,13 @@ export WORKFLOW_DIR="/workspace/ComfyUI/input"
 export COMFYUI_DIR="/workspace/ComfyUI"
 export GRADIO_LOG="/workspace/logs/gradio_output.log"
 export NGROK_LOG="/workspace/logs/ngrok_output.log"
+export HOME="/home/user"
 export PATH="$HOME/.local/bin:/usr/bin:$PATH"
+echo "$PATH" | tee -a /workspace/provision.log
 
-pip3 install --user torch torchvision torchaudio
+mkdir -p /home/user/.local
+chown -R user:user /home/user/.local
+"$HOME" pip3 install --user torch torchvision torchaudio
 
 mkdir -p /workspace/{logs,.local/bin}
 
