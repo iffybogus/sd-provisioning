@@ -10,6 +10,7 @@ if [ -d /workspace ] && [ ! -L /workspace ]; then
 fi
 
 ln -sfn /mnt/workspace /workspace
+chown user:user /workspace
 
 # ────── Step 1: Setup Logging ──────
 mkdir -p /workspace/logs
