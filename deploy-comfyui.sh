@@ -20,13 +20,9 @@ export WORKFLOW_DIR="/workspace/ComfyUI/input"
 export COMFYUI_DIR="/workspace/ComfyUI"
 export GRADIO_LOG="/workspace/logs/gradio_output.log"
 export NGROK_LOG="/workspace/logs/ngrok_output.log"
-
-su - user << 'EOF'
 export PATH="\$HOME/.local/bin:\$PATH"
 pip3 install --user torch torchvision torchaudio
-EOF
 
-su - user << 'EOF'
 mkdir -p /workspace/{logs,.local/bin}
 
 # ────── Step 2: Git & Python Setup ──────
@@ -49,27 +45,51 @@ nohup python3 "$COMFYUI_DIR/main.py" --port "$COMFYUI_PORT" > /workspace/logs/co
 sleep 6
 
 # ────── Step 4: Download WAN2.1 Models ──────
+download_with_retry() {
+  local url="$1"
+  local output="$2"
+  local max_retries=5
+  local wait_seconds=30
+  local attempt=1
+
+  while [ "$attempt" -le "$max_retries" ]; do
+    echo "[INFO] Attempt $attempt: Downloading $output" | tee -a /workspace/provision.log
+    wget -nv -O "$output" "$url"
+    if [ $? -eq 0 ]; then
+      echo "[SUCCESS] Downloaded $output" | tee -a /workspace/provision.log
+      return 0
+    else
+      echo "[WARN] Failed to download $output — retrying in $wait_seconds seconds..." | tee -a /workspace/provision.log
+      sleep "$wait_seconds"
+      attempt=$((attempt+1))
+    fi
+  done
+
+  echo "[ERROR] Giving up on $output after $max_retries attempts." | tee -a /workspace/provision.log
+  return 1
+}
+
 mkdir -p "$WAN_DIR"/{clip_vision,vae,diffusion_models,unet,clip}
 cd "$WAN_DIR"
 
-download() { wget -nv -O "$2" "$1"; }
+#download() { wget -nv -O "$2" "$1"; }
 
-download "https://huggingface.co/Comfy-Org/...clip_vision_h.safetensors" "clip_vision/clip_vision_h.safetensors"
-download "https://huggingface.co/Comfy-Org/...wan_2.1_vae.safetensors" "vae/wan_2.1_vae.safetensors"
-download "https://huggingface.co/Comfy-Org/...wan2.1_i2v_720p_14B_fp16.safetensors" "diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
-download "https://huggingface.co/Comfy-Org/...wan2.1_t2v_1.3B_fp16.safetensors" "unet/wan2.1_t2v_1.3B_fp16.safetensors"
-download "https://huggingface.co/Comfy-Org/...wan2.1_t2v_14B_fp16.safetensors" "unet/wan2.1_t2v_14B_fp16.safetensors"
-download "https://huggingface.co/Comfy-Org/...wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
-download "https://huggingface.co/Comfy-Org/...umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors" "clip_vision/clip_vision_h.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" "vae/wan_2.1_vae.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors" "diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors" "unet/wan2.1_t2v_1.3B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors" "unet/wan2.1_t2v_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors" "vae/wan2.1_vace_14B_fp16.safetensors"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 # ────── Step 5: Download Workflows ──────
 mkdir -p "$WORKFLOW_DIR"
 cd "$WORKFLOW_DIR"
 
-download "https://huggingface.co/Comfy-Org/...text_to_video_wan.json" "text_to_video_wan.json"
-download "https://huggingface.co/Comfy-Org/...image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
-download "https://huggingface.co/Comfy-Org/...image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
-EOF
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/text_to_video_wan.json" "text_to_video_wan.json"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_720p_example.json" "image_to_video_wan_720p_example.json"
+download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/example%20workflows_Wan2.1/image_to_video_wan_480p_example.json" "image_to_video_wan_480p_example.json"
+
 # ────── Step 6: Gradio Tunnel ──────
 cat << 'EOF' > "$COMFYUI_DIR/launch_gradio.py"
 import gradio as gr
@@ -79,7 +99,7 @@ gr.Interface(fn=inference_fn, inputs="text", outputs="text").launch(
     server_name="0.0.0.0", server_port=$COMFYUI_PORT, share=True
 )
 EOF
-=====
+
 nohup python3 "$COMFYUI_DIR/launch_gradio.py" > "$GRADIO_LOG" 2>&1 &
 sleep 10
 GRADIO_URL=$(grep -o 'https://.*\.gradio\.live' "$GRADIO_LOG" | head -n 1)
@@ -107,3 +127,4 @@ fi
 
 # ────── Step 9: Final Ownership ──────
 chown -R user:user /workspace
+
