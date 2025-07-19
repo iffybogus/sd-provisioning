@@ -43,10 +43,10 @@ download_with_retry() {
 # ────── Step 0.1: Environment Variables ──────
 export COMFYUI_PORT=7801
 export GRADIO_PORT=7860
-export WAN_PATH="/workspace/SwarmUI/Models/diffusion_models/WAN2.1"
+export WAN_PATH="/workspace/ComfyUI/Models/diffusion_models/"
 export SESSION_LOG="/workspace/logs/session_response.log"
 export GRADIO_ENV="/workspace/.gradio"
-export GRADIO_SCRIPT="/workspace/SwarmUI/launch_gradio.py"
+export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
 export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
 export MODEL_USER="user"
 
@@ -129,7 +129,7 @@ download_with_retry "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
 
 echo "[INFO] Generating Gradio UI script..." | tee -a /workspace/provision.log 
 su - "$MODEL_USER" <<'EOF' 
-cat <<'PYCODE' > /workspace/SwarmUI/launch_gradio.py 
+cat <<'PYCODE' > /workspace/ComfyUI/launch_gradio.py 
 import gradio as gr 
 import os 
 
@@ -157,7 +157,6 @@ demo.queue().launch(
     server_port=7801,
     share=True
 )
-
 
 PYCODE 
 EOF
