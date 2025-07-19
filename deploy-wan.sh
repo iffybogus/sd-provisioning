@@ -116,8 +116,7 @@ download_with_retry() {
   return 1
 }
 
-
-# ────── Step 7: Download WAN2.1 models ──────
+# ────── Step 7.5: Download WAN2.1 models ──────
 echo "[INFO] Step 7: Downloading WAN2.1 models..." | tee -a /workspace/provision.log
 
 mkdir -p /workspace/ComfyUI/models/{clip_vision,vae,diffusion_models,unet,clip}
