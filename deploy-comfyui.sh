@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -e
+set -x
+exec > >(tee -a /workspace/provisioning.log) 2>&1
+
 # ────── Step 0: Redirect /workspace to mounted disk ──────
 echo "[INFO] Redirecting /workspace to /mnt/workspace"
 mkdir -p /mnt/workspace
@@ -15,6 +19,18 @@ chown user:user /workspace
 # ────── Step 1: Setup Logging ──────
 mkdir -p /workspace/logs
 touch /workspace/provisioning.log
+
+# ────── Step 0.1: Environment Variables ──────
+export COMFYUI_PORT=7801
+export GRADIO_PORT=7860
+export WAN_PATH="/workspace/ComfyUI/models/diffusion_models/"
+export SESSION_LOG="/workspace/logs/session_response.log"
+export GRADIO_ENV="/workspace/.gradio"
+export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
+export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
+export MODEL_USER="user"
+
+mkdir -p /workspace/logs "$GRADIO_ENV/frpc"
 
 # ────── Step 2: Define Retry Download Function ──────
 download_with_retry() {
@@ -40,18 +56,6 @@ download_with_retry() {
   echo "[ERROR] Giving up on $output after $max_retries attempts." | tee -a /workspace/provisioning.log
   return 1
 }
-
-# ────── Step 0.1: Environment Variables ──────
-export COMFYUI_PORT=7801
-export GRADIO_PORT=7860
-export WAN_PATH="/workspace/ComfyUI/models/diffusion_models/"
-export SESSION_LOG="/workspace/logs/session_response.log"
-export GRADIO_ENV="/workspace/.gradio"
-export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
-export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
-export MODEL_USER="user"
-
-mkdir -p /workspace/logs "$GRADIO_ENV/frpc"
 
 # ────── Step 0.5: System & user setup ──────
 
@@ -91,7 +95,8 @@ wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_li
 chmod +x "$FRPC_BIN"
 
 # ────── Step 6: Install ComfyUI ──────
-COMFYUI_DIR="/workspace/ComfyUI"
+export COMFYUI_DIR="/workspace/ComfyUI"
+mv -f "$COMFYUI_DIR" ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
 fi
@@ -99,7 +104,8 @@ pip3 install -r "$COMFYUI_DIR/requirements.txt"
 pip3 install safetensors einops tqdm
 chown -R "$MODEL_USER:$MODEL_USER" "$COMFYUI_DIR"
 chmod -R u+rwX "$COMFYUI_DIR"
-
+cp -r ComfyUI2 ComfyUI
+mv -f ComfyUI2
 # ────── Step 10: Launch ComfyUI on port 7802 ──────
 nohup python3 /workspace/ComfyUI/main.py --port 7801 >> /workspace/comfy_output.log 2>&1 &
 sleep 6
