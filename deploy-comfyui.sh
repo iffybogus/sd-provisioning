@@ -43,7 +43,7 @@ download_with_retry() {
 # ────── Step 0.1: Environment Variables ──────
 export COMFYUI_PORT=7801
 export GRADIO_PORT=7860
-export WAN_PATH="/workspace/ComfyUI/Models/diffusion_models/"
+export WAN_PATH="/workspace/ComfyUI/models/diffusion_models/"
 export SESSION_LOG="/workspace/logs/session_response.log"
 export GRADIO_ENV="/workspace/.gradio"
 export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
