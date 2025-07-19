@@ -50,7 +50,7 @@ export GRADIO_SCRIPT="/workspace/ComfyUI/launch_gradio.py"
 export FRPC_PATH="$GRADIO_ENV/frpc/frpc_linux_amd64_v0.3"
 export MODEL_USER="user"
 
-mkdir -p "$WAN_PATH" /workspace/logs "$GRADIO_ENV/frpc"
+mkdir -p /workspace/logs "$GRADIO_ENV/frpc"
 
 # ────── Step 0.5: System & user setup ──────
 
@@ -88,6 +88,7 @@ wget -nv -O "$FRPC_BIN" https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_li
   }
 }
 chmod +x "$FRPC_BIN"
+
 # ────── Step 6: Install ComfyUI ──────
 COMFYUI_DIR="/workspace/ComfyUI"
 if [ ! -d "$COMFYUI_DIR" ]; then
