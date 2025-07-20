@@ -26,7 +26,7 @@ echo "$PATH" | tee -a /workspace/provision.log
 
 mkdir -p /home/user/.local
 chown -R user:user /home/user/.local
-"$HOME" pip3 install --user torch torchvision torchaudio
+HOME=/home/user pip3 install --user torch torchvision torchaudio
 
 mkdir -p /workspace/{logs,.local/bin}
 
