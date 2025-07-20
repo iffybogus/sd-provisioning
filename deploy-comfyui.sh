@@ -35,10 +35,12 @@ cd /workspace
 mv -f ComfyUI ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
+  cd /workspace/ComfyUI/custom_nodes
+  git clone https://github.com/ltdrdata/ComfyUI-Manager comfyui-manager
 fi
-
+cd /workspace
 pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
-pip3 install --user safetensors einops tqdm gradio
+pip3 install --user safetensors einops tqdm gradio Pillow
 
 chown -R user:user "$COMFYUI_DIR"
 cp -R ComfyUI2 ComfyUI
@@ -101,7 +103,7 @@ import gradio as gr
 
 def inference_fn(x): return f"Echo: {x}"
 gr.Interface(fn=inference_fn, inputs="text", outputs="text").launch(
-    server_name="0.0.0.0", server_port=$COMFYUI_PORT, share=True
+    server_name="0.0.0.0", server_port=7801, share=True
 )
 EOF
 
@@ -110,19 +112,23 @@ sleep 10
 GRADIO_URL=$(grep -o 'https://.*\.gradio\.live' "$GRADIO_LOG" | head -n 1)
 
 # ────── Step 7: Ngrok Tunnel ──────
+cd /tmp
 wget -qO /tmp/ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+chmod user:user ngrok.tgz
 tar -xzf /tmp/ngrok.tgz -C /workspace/.local/bin/
 chmod +x /workspace/.local/bin/ngrok
 export PATH="/workspace/.local/bin:$PATH"
 
-ngrok authtoken "$NGROK_TOKEN"
-nohup ngrok http "$COMFYUI_PORT" > "$NGROK_LOG" 2>&1 &
+cd /workspace/.local/bin/
+chmod user:user ngrok
+./ngrok authtoken "$NGROK_TOKEN"
+nohup ./ngrok http "$COMFYUI_PORT" > "$NGROK_LOG" 2>&1 &
 sleep 6
 NGROK_URL=$(grep -o 'https://[^ ]*\.ngrok-free.app' "$NGROK_LOG" | head -n 1)
 
 # ────── Step 8: Webhook Notification ──────
 TUNNEL_URL="${GRADIO_URL:-$NGROK_URL}"
-echo "[INFO] Tunnel URL: $TUNNEL_URL" | tee -a /workspace/provisioning.log
+echo "[INFO] Tunnel URL: $TUNNEL_URL $NGROK_URL" | tee -a /workspace/provisioning.log
 
 if [[ -n "$TUNNEL_URL" ]]; then
   curl -X POST -H "Content-Type: application/json" \
