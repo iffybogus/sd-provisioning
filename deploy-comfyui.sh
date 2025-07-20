@@ -103,7 +103,7 @@ import gradio as gr
 
 def inference_fn(x): return f"Echo: {x}"
 gr.Interface(fn=inference_fn, inputs="text", outputs="text").launch(
-    server_name="0.0.0.0", server_port=7801, share=True
+    server_name="0.0.0.0", server_port=7860, share=True
 )
 EOF
 
