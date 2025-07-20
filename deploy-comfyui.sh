@@ -114,7 +114,7 @@ GRADIO_URL=$(grep -o 'https://.*\.gradio\.live' "$GRADIO_LOG" | head -n 1)
 # ────── Step 7: Ngrok Tunnel ──────
 cd /tmp
 wget -qO /tmp/ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-chmod user:user ngrok.tgz
+chown user:user ngrok.tgz
 tar -xzf /tmp/ngrok.tgz -C /workspace/.local/bin/
 chmod +x /workspace/.local/bin/ngrok
 export PATH="/workspace/.local/bin:$PATH"
