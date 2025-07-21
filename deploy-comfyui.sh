@@ -12,7 +12,7 @@ if [ "$(whoami)" = "root" ]; then
   echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
   exit 1
 fi
-sudo cd /tmp
+
 sudo mv /workspace/ComfyUI /tmp/ComfyUI2
 sudo apt install -y s3fs
 sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
