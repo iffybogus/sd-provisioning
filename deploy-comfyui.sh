@@ -12,7 +12,7 @@ if [ "$(whoami)" = "root" ]; then
   echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
   exit 1
 fi
-
+mv /workspace/ComfyUI /tmp/ComfyUI2
 sudo apt install s3fs
 echo "$(aws secretsmanager get-secret-value --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
 chmod 600 ~/.passwd-s3fs
@@ -42,7 +42,7 @@ mkdir -p /workspace/{logs,.local/bin}
 
 # ────── Step 2: Git & Python Setup ──────
 cd /workspace
-mv -f ComfyUI ComfyUI2
+#mv -f ComfyUI ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
   cd /workspace/ComfyUI/custom_nodes
@@ -53,8 +53,8 @@ pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
 pip3 install --user safetensors einops tqdm gradio Pillow
 
 chown -R user:user "$COMFYUI_DIR"
-cp -R ComfyUI2 ComfyUI
-rm -rf ComfyUI2
+cp -R /tmp/ComfyUI2 ComfyUI
+rm -rf /tmp/ComfyUI2
 
 # ────── Step 3: Launch ComfyUI ──────
 
