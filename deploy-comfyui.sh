@@ -19,7 +19,7 @@ sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv
 sudo unzip awscliv2.zip
 sudo ./aws/install
 sudo aws --version
-sudo echo "$(aws secretsmanager get-secret-value --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
+sudo echo "$(aws secretsmanager get-secret-value --region us-east-1 --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
 sudo chmod 600 ~/.passwd-s3fs
 sudo mkdir -p /mnt/comfy-cache
 sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/.passwd-s3fs
