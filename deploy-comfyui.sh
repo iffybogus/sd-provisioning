@@ -12,7 +12,7 @@ if [ "$(whoami)" = "root" ]; then
   echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
   exit 1
 fi
-mv /workspace/ComfyUI /tmp/ComfyUI2
+sudo mv /workspace/ComfyUI /tmp/ComfyUI2
 sudo apt install -y s3fs
 echo "$(aws secretsmanager get-secret-value --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
 chmod 600 ~/.passwd-s3fs
@@ -20,6 +20,7 @@ mkdir -p /mnt/comfy-cache
 s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/.passwd-s3fs
 ln -s /mnt/comfy-cache/workspace /workspace
 cp /tmp/provisioning.log /workspace
+sudo chown -R user:user /workspace
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
 # ────── Step 1: Environment Setup ──────
@@ -52,9 +53,9 @@ cd /workspace
 pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
 pip3 install --user safetensors einops tqdm gradio Pillow
 
-chown -R user:user "$COMFYUI_DIR"
-cp -R /tmp/ComfyUI2 ComfyUI
-rm -rf /tmp/ComfyUI2
+sudo chown -R user:user "$COMFYUI_DIR"
+sudo cp -R /tmp/ComfyUI2 ComfyUI
+sudo rm -rf /tmp/ComfyUI2
 
 # ────── Step 3: Launch ComfyUI ──────
 
