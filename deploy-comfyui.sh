@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-exec > >(tee -a /workspace/provisioning.log) 2>&1
+exec > >(tee -a /tmp/provisioning.log) 2>&1
 
 # ────── Step 0: Ensure we're running as user ──────
 if [ "$(whoami)" != "user" ]; then
@@ -19,6 +19,8 @@ chmod 600 ~/.passwd-s3fs
 mkdir -p /mnt/comfy-cache
 s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/.passwd-s3fs
 ln -s /mnt/comfy-cache/workspace /workspace
+cp /tmp/provisioning.log /workspace
+exec > >(tee -a /workspace/provisioning.log) 2>&1
 
 # ────── Step 1: Environment Setup ──────
 export COMFYUI_PORT=7801
