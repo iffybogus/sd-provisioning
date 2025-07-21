@@ -13,7 +13,7 @@ if [ "$(whoami)" = "root" ]; then
   exit 1
 fi
 mv /workspace/ComfyUI /tmp/ComfyUI2
-sudo apt install s3fs
+sudo apt install -y s3fs
 echo "$(aws secretsmanager get-secret-value --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
 chmod 600 ~/.passwd-s3fs
 mkdir -p /mnt/comfy-cache
