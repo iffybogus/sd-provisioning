@@ -12,6 +12,14 @@ if [ "$(whoami)" = "root" ]; then
   echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
   exit 1
 fi
+
+apt install s3fs
+echo "$(aws secretsmanager get-secret-value --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
+chmod 600 ~/.passwd-s3fs
+mkdir -p /mnt/comfy-cache
+s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/.passwd-s3fs
+ln -s /mnt/comfy-cache/workspace /workspace
+
 # ────── Step 1: Environment Setup ──────
 export COMFYUI_PORT=7801
 export NGROK_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
@@ -138,4 +146,7 @@ fi
 
 # ────── Step 9: Final Ownership ──────
 chown -R user:user /workspace
+tar -czf python_packages.tar.gz ~/.local/lib/python3.*/site-packages
+aws s3 cp python_packages.tar.gz s3://vastai.bucket/comfy-cache/
+
 
