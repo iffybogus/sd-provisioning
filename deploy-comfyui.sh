@@ -13,19 +13,10 @@ if [ "$(whoami)" = "root" ]; then
   exit 1
 fi
 
-
-#!/bin/bash
-
 # Configurable parameters
 SECRET_ID="s3fs/vastai/ComfyUI"
 S3FS_CREDS="/root/.passwd-s3fs"
 AWS_REGION="us-east-1"
-
-# Ensure AWS CLI is available
-if ! command -v aws &> /dev/null; then
-  echo "AWS CLI not found. Please install it before running this script."
-  exit 1
-fi
 
 sudo mv /workspace/ComfyUI /tmp/ComfyUI2
 sudo apt install -y s3fs
@@ -45,6 +36,11 @@ aws secretsmanager get-secret-value \
 #sudo chmod 600 ~/.passwd-s3fs
 sudo chmod 600 "$S3FS_CREDS"
 echo "✅ AWS secret loaded into $S3FS_CREDS"
+# Ensure AWS CLI is available
+if ! command -v aws &> /dev/null; then
+  echo "AWS CLI not found. Please install it before running this script."
+  exit 1
+fi
 sudo mkdir -p /mnt/comfy-cache
 sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/root/.passwd-s3fs
 sudo ln -s /mnt/comfy-cache/workspace /workspace
