@@ -13,16 +13,40 @@ if [ "$(whoami)" = "root" ]; then
   exit 1
 fi
 
+
+#!/bin/bash
+
+# Configurable parameters
+SECRET_ID="s3fs/vastai/ComfyUI"
+S3FS_CREDS="/root/.passwd-s3fs"
+AWS_REGION="us-east-1"
+
+# Ensure AWS CLI is available
+if ! command -v aws &> /dev/null; then
+  echo "AWS CLI not found. Please install it before running this script."
+  exit 1
+fi
+
 sudo mv /workspace/ComfyUI /tmp/ComfyUI2
 sudo apt install -y s3fs
 sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 sudo unzip awscliv2.zip
 sudo ./aws/install
 sudo aws --version
-sudo echo "$(aws secretsmanager get-secret-value --region us-east-1 --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
-sudo chmod 600 ~/.passwd-s3fs
+
+# Fetch and apply secret securely
+aws secretsmanager get-secret-value \
+  --region "$AWS_REGION" \
+  --secret-id "$SECRET_ID" \
+  --query 'SecretString' \
+  --output text | sudo tee "$S3FS_CREDS" > /dev/null
+
+#sudo echo "$(aws secretsmanager get-secret-value --region us-east-1 --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
+#sudo chmod 600 ~/.passwd-s3fs
+sudo chmod 600 "$S3FS_CREDS"
+echo "✅ AWS secret loaded into $S3FS_CREDS"
 sudo mkdir -p /mnt/comfy-cache
-sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/.passwd-s3fs
+sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/root/.passwd-s3fs
 sudo ln -s /mnt/comfy-cache/workspace /workspace
 sudo chown -R user:user /workspace
 cp /tmp/provisioning.log /workspace
