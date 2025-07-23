@@ -42,7 +42,7 @@ if ! command -v aws &> /dev/null; then
   exit 1
 fi
 sudo mkdir -p /mnt/comfy-cache
-sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/root/.passwd-s3fs
+sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=~/root/.passwd-s3fs -o use_path_request_style -o url=https://s3.us-east-1.amazonaws.com
 sudo ln -s /mnt/comfy-cache/workspace /workspace
 sudo chown -R user:user /workspace
 cp /tmp/provisioning.log /workspace
