@@ -13,6 +13,8 @@ if [ "$(whoami)" = "root" ]; then
   exit 1
 fi
 
+sudo source /etc/environment
+
 # Configurable parameters
 SECRET_ID="s3fs/vastai/ComfyUI"
 S3FS_CREDS="/root/.passwd-s3fs"
