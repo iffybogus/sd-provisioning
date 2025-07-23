@@ -13,7 +13,7 @@ if [ "$(whoami)" = "root" ]; then
   exit 1
 fi
 
-sudo source /etc/environment
+sudo bash -c 'source /etc/environment'
 
 # Configurable parameters
 SECRET_ID="s3fs/vastai/ComfyUI"
