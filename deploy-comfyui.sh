@@ -26,11 +26,11 @@ sudo ./aws/install
 sudo aws --version
 
 # Fetch and apply secret securely
-aws secretsmanager get-secret-value \
-  --region "$AWS_REGION" \
+sudo aws secretsmanager get-secret-value \
+  --region "$AWS_DEFAULT_REGION" \
   --secret-id "$SECRET_ID" \
   --query 'SecretString' \
-  --output text | sudo tee "$S3FS_CREDS" > /dev/null
+  --output text | jq -r '"\("$AWS_ACCESS_KEY_ID"):\("$AWS_SECRET_ACCESS_KEY")"' | sudo tee "$S3FS_CREDS" > /dev/null
 
 #sudo echo "$(aws secretsmanager get-secret-value --region us-east-1 --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
 #sudo chmod 600 ~/.passwd-s3fs
@@ -45,7 +45,7 @@ sudo mkdir -p /mnt/comfy-cache
 sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=/root/.passwd-s3fs -o use_path_request_style -o url=https://s3.us-east-1.amazonaws.com
 sudo ln -s /mnt/comfy-cache/workspace /workspace
 sudo chown -R user:user /workspace
-cp /tmp/provisioning.log /workspace
+sudo cp /tmp/provisioning.log /workspace
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
 # ────── Step 1: Environment Setup ──────
