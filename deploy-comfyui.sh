@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -e
-exec > >(tee -a /tmp/provisioning.log) 2>&1
+exec > >(tee -a /workspace/provisioning.log) 2>&1
 
 # ────── Step 0: Ensure we're running as user ──────
 if [ "$(whoami)" != "user" ]; then
@@ -12,44 +12,6 @@ if [ "$(whoami)" = "root" ]; then
   echo "[ERROR] Do not run pip installs as root. Use su - user." >&2
   exit 1
 fi
-
-sudo bash -c 'source /etc/environment'
-
-# Configurable parameters
-SECRET_ID="s3fs/vastai/ComfyUI"
-S3FS_CREDS="/root/.passwd-s3fs"
-AWS_REGION="us-east-1"
-
-sudo mv /workspace/ComfyUI /tmp/ComfyUI2
-sudo apt install -y s3fs
-sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-sudo unzip awscliv2.zip
-sudo ./aws/install
-sudo aws --version
-
-# Fetch and apply secret securely
-sudo aws secretsmanager get-secret-value \
-  --region "$AWS_DEFAULT_REGION" \
-  --secret-id "$SECRET_ID" \
-  --query 'SecretString' \
-  --output text | jq -r '"\("$AWS_ACCESS_KEY_ID"):\("$AWS_SECRET_ACCESS_KEY")"' | sudo tee "$S3FS_CREDS" > /dev/null
-
-#sudo echo "$(aws secretsmanager get-secret-value --region us-east-1 --secret-id s3fs/vastai/ComfyUI --query 'SecretString' --output text)" > ~/.passwd-s3fs
-#sudo chmod 600 ~/.passwd-s3fs
-sudo chmod 600 "$S3FS_CREDS"
-echo "✅ AWS secret loaded into $S3FS_CREDS"
-# Ensure AWS CLI is available
-if ! command -v aws &> /dev/null; then
-  echo "AWS CLI not found. Please install it before running this script."
-  exit 1
-fi
-sudo mkdir -p /mnt/comfy-cache
-sudo s3fs vastai.bucket /mnt/comfy-cache -o passwd_file=/root/.passwd-s3fs -o use_path_request_style -o url=https://s3.us-east-1.amazonaws.com
-sudo ln -s /mnt/comfy-cache/workspace /workspace
-sudo chown -R user:user /workspace
-sudo cp /tmp/provisioning.log /workspace
-exec > >(tee -a /workspace/provisioning.log) 2>&1
-
 # ────── Step 1: Environment Setup ──────
 export COMFYUI_PORT=7801
 export NGROK_TOKEN="301FQa9CBoZxUbFgmaFoYjQ31iO_62sr8sfM9oYMCaWLMyzdm"
@@ -70,7 +32,7 @@ mkdir -p /workspace/{logs,.local/bin}
 
 # ────── Step 2: Git & Python Setup ──────
 cd /workspace
-#mv -f ComfyUI ComfyUI2
+mv -f ComfyUI ComfyUI2
 if [ ! -d "$COMFYUI_DIR" ]; then
   git clone https://github.com/comfyanonymous/ComfyUI "$COMFYUI_DIR"
   cd /workspace/ComfyUI/custom_nodes
@@ -80,9 +42,9 @@ cd /workspace
 pip3 install --user -r "$COMFYUI_DIR/requirements.txt"
 pip3 install --user safetensors einops tqdm gradio Pillow
 
-sudo chown -R user:user "$COMFYUI_DIR"
-sudo cp -R /tmp/ComfyUI2 ComfyUI
-sudo rm -rf /tmp/ComfyUI2
+chown -R user:user "$COMFYUI_DIR"
+cp -R ComfyUI2 ComfyUI
+rm -rf ComfyUI2
 
 # ────── Step 3: Launch ComfyUI ──────
 
@@ -176,7 +138,3 @@ fi
 
 # ────── Step 9: Final Ownership ──────
 chown -R user:user /workspace
-tar -czf python_packages.tar.gz ~/.local/lib/python3.*/site-packages
-aws s3 cp python_packages.tar.gz s3://vastai.bucket/comfy-cache/
-
-
