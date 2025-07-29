@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+sudo chown user:user /workspace
 exec > >(tee -a /workspace/provisioning.log) 2>&1
 
 # ────── Step 0: Ensure we're running as user ──────
