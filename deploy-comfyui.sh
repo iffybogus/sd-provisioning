@@ -45,7 +45,7 @@ pip3 install --user safetensors einops tqdm gradio Pillow
 
 chown -R user:user "$COMFYUI_DIR"
 cp -R ComfyUI2 ComfyUI
-rm -rf ComfyUI2
+sudo rm -rf ComfyUI2
 
 # ────── Step 3: Launch ComfyUI ──────
 
